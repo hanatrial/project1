@@ -20,6 +20,9 @@
   .seg button[aria-pressed=true]{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc);font-weight:600}
   button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
   .take{margin:0}
+  .xbtn{font:inherit;font-weight:600;min-height:42px;margin-top:12px;padding:8px 16px;border-radius:10px;border:1px solid var(--acc);background:transparent;color:var(--acc);cursor:pointer}
+  .xbtn:disabled{opacity:.5;cursor:default}
+  .xbtn:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
   .srch{font:inherit;width:100%;min-height:42px;margin-top:12px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);-webkit-appearance:none}
   .srch:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
   .po{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -78,6 +81,7 @@
     <h2>Item summary</h2>
     <p class="note" id="legend"></p>
     <div class="chips" id="chips"></div>
+    <button type="button" class="xbtn" id="xl">Export Excel</button>
     <input type="search" id="q" class="srch" placeholder="Cari nama item…" autocomplete="off" enterkeyhint="search" aria-label="Cari item">
     <p class="note" id="qn"></p>
     <div class="scroll"><table>
@@ -143,7 +147,7 @@ function rowsOf(k){
   const n=D.months.length;
   return D.items.map(o=>{
     const {u,div}=unitOf(o.n),d=o.d[k]||[0,0,0,0,0,0],avg=(d[0]+d[1]+d[2])/n/div,stock=(o.s[k]||0)/div;
-    return{n:o.n,t:o.t,u,q:d.slice(0,3).map(v=>v/div),avg,ar:(d[3]+d[4]+d[5])/n,stock,doi:doi(stock,avg),po:poOf(avg,stock),st:status(stock,avg)};
+    return{kode:o.kode,n:o.n,t:o.t,u,q:d.slice(0,3).map(v=>v/div),avg,ar:(d[3]+d[4]+d[5])/n,stock,doi:doi(stock,avg),po:poOf(avg,stock),st:status(stock,avg)};
   }).filter(r=>r.st).sort((a,b)=>grp(a.n)-grp(b.n)||b.ar-a.ar||b.stock-a.stock);
 }
 function render(){
@@ -175,6 +179,48 @@ function render(){
   $('foot').textContent='Terakhir upload: selling out '+(D.lastSo?wita(D.lastSo):'-')+' · stok '+(D.lastSt?wita(D.lastSt):'-')+'. Sumber: laporan Selling Out PD dan Stock Baik (Indogrosir dan SPI). Satuan: semua CTN kecuali HILO (PCS). 1 CTN = 720 pcs untuk NutriSari American Sweet Orange, Florida Orange, dan Jeruk Peras, selain itu 160 pcs. Avg dibagi jumlah bulan, termasuk bulan tanpa penjualan. Cabang SPI bertambah sepanjang 2026, jadi bulan awal tidak sepenuhnya setara.';
 }
 $('q').addEventListener('input',render);
+// ---- Export Excel: satu sheet per kota, isi dan warna sama dengan Item summary, kolom Kode di depan ----
+const XL_URL='https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+let xlP=null;
+const loadXl=()=>window.ExcelJS?Promise.resolve():xlP||(xlP=new Promise((ok,no)=>{const s=document.createElement('script');s.src=XL_URL;s.onload=ok;s.onerror=()=>{xlP=null;no(new Error('Pustaka Excel gagal dimuat, cek internet'))};document.head.append(s)}));
+const XC={low:['FDE3E6','C63A47'],warn:['FBF0DC','B5771A'],ok:['DDF1E8','137A5A'],high:['DFE9F6','2F6FB5'],idle:['EDEFEE','7A857F']};
+async function exportXlsx(){
+  const b=$('xl');b.disabled=true;b.textContent='Menyiapkan…';
+  try{
+    await loadXl();
+    const wb=new ExcelJS.Workbook(),mon=D.months.map(m=>BLN[+m.slice(5)]);
+    const order=[kota,...['Manado','Makassar','Kendari','Gorontalo'].filter(k=>k!==kota)];
+    for(const k of order){
+      const ws=wb.addWorksheet(k,{views:[{state:'frozen',xSplit:3,ySplit:3}]}),r=rowsOf(k);
+      ws.getCell('A1').value='Item Summary '+k+' · stok per '+(D.stokDate?dlbl(D.stokDate):'-')+' · avg '+mon.join(', ')+' · Suggest PO untuk DOI '+target+' hari';
+      ws.getCell('A1').font={bold:true,size:12};
+      const head=['Kode','Item','Tipe','Sat','Stock','Avg / bln','DOI (hari)','Suggest PO',...mon,'Avg Rp / bln'];
+      const hr=ws.getRow(3);hr.values=head;
+      hr.eachCell(c=>{c.font={bold:true,color:{argb:'FF5A6660'}};c.alignment={horizontal:'center',vertical:'middle',wrapText:true};c.border={bottom:{style:'thin',color:{argb:'FF9AA7A0'}}}});
+      r.forEach((x,i)=>{
+        const row=ws.getRow(4+i);
+        row.values=[x.kode,x.n,x.t,x.u,x.stock,x.avg,x.doi==null?'∞':x.doi,x.po||0,...x.q,x.ar];
+        row.getCell(1).numFmt='@';
+        const f=x.u==='CTN'?'#,##0.0':'#,##0';
+        [5,6,9,10,11].forEach(c=>row.getCell(c).numFmt=f);
+        row.getCell(7).numFmt='#,##0';row.getCell(8).numFmt='#,##0';row.getCell(12).numFmt='#,##0';
+        [3,4].forEach(c=>row.getCell(c).alignment={horizontal:'center'});
+        row.getCell(7).alignment={horizontal:'right'};
+        const col=XC[x.st];
+        [5,6,7].forEach(c=>{const cell=row.getCell(c);cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+col[0]}};cell.font={bold:true,color:{argb:'FF'+col[1]}}});
+        row.getCell(8).font={bold:x.po>0};
+      });
+      [12,52,7,6,11,11,11,12,10,10,10,17].forEach((w,i)=>ws.getColumn(i+1).width=w);
+      ws.getRow(3).height=30;ws.autoFilter={from:{row:3,column:1},to:{row:3+r.length,column:head.length}};
+    }
+    const buf=await wb.xlsx.writeBuffer();
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+    a.download='Item-Summary_'+(D.stokDate||'')+'_DOI'+target+'.xlsx';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    b.textContent='Export Excel';
+  }catch(e){b.textContent='Gagal: '+e.message}
+  b.disabled=false;
+}
+$('xl').addEventListener('click',()=>{if(D)exportXlsx()});
 $('tdoi').value=target;
 $('tdoi').addEventListener('input',e=>{const v=Math.round(+e.target.value);if(!(v>=1&&v<=365))return;target=v;try{localStorage.setItem('targetDoi',String(v))}catch(x){}render()});
 $('seg').addEventListener('click',e=>{
