@@ -146,10 +146,11 @@ function parsePO(a){
   for(let i=5;i<a.length;i++){
     const r=a[i];if(!r||!r[C.br])continue;const cab=String(r[C.br]).replace(/^\s*\w+\s-\s/,'').trim();
     if(!kotaOf(cab))continue;
+    if(!/\b(RCG|SCT)\b/i.test(String(r[C.nm]||'')))continue;   // hanya item RCG dan SCT
     const stt=String(r[C.st]||'').trim().toUpperCase();
     rows.push([cab,String(r[C.id]).trim(),String(r[C.nm]||'').trim(),num(r[C.q]),num(r[C.v]),String(r[C.no]||'').trim(),toIso(r[C.d]),toIso(r[C.ex]),stt]);
   }
-  if(!rows.length)throw new Error('Tidak ada PO untuk cabang Manado, Makassar, Kendari, atau Gorontalo');
+  if(!rows.length)throw new Error('Tidak ada PO item RCG atau SCT untuk cabang Manado, Makassar, Kendari, atau Gorontalo');
   return{type:'po',key:date,rows,cabang:new Set(rows.map(r=>r[0])).size,items:new Set(rows.map(r=>r[1])).size,qty:rows.reduce((s,r)=>s+r[3],0),stat:rows.reduce((o,r)=>(o[r[8]]=(o[r[8]]||0)+1,o),{})};
 }
 function parseStock(a){
