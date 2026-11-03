@@ -20,6 +20,14 @@
   .seg button[aria-pressed=true]{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc);font-weight:600}
   button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
   .take{margin:0}
+  .srch{font:inherit;width:100%;min-height:42px;margin-top:12px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);-webkit-appearance:none}
+  .srch:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+  .po{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .po label{font-weight:600}
+  .po input{font:inherit;width:6rem;min-height:42px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--fg);font-variant-numeric:tabular-nums}
+  .po input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+  td.po-c{font-weight:700;color:var(--fg)}
+  td.po-c.z{font-weight:400;color:var(--mut)}
   .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,13rem),1fr));gap:12px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
   .tile .big{display:block;font-size:1.9rem;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;margin-top:4px}
@@ -30,11 +38,6 @@
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
   .chip{display:inline-flex;gap:6px;align-items:center;padding:3px 10px;border-radius:999px;font-size:.78rem;color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent);border:1px solid color-mix(in srgb,var(--c) 40%,transparent)}
   .chip b{font-variant-numeric:tabular-nums}
-  .bars{display:flex;flex-direction:column;gap:10px;margin-top:12px}
-  .bn{font-size:.82rem;overflow-wrap:anywhere}
-  .bt{display:flex;align-items:center;gap:8px}
-  .bf{height:14px;border-radius:4px;background:var(--acc);min-width:2px}
-  .bv{font-size:.8rem;color:var(--mut);font-variant-numeric:tabular-nums;white-space:nowrap}
   .scroll{overflow:auto;max-height:36rem;margin-top:12px}
   table{width:100%;border-collapse:collapse;font-size:.82rem;font-variant-numeric:tabular-nums}
   th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
@@ -45,7 +48,6 @@
   td.c small{display:block;font-weight:400;color:var(--mut);font-size:.72rem}
   .pill{display:inline-block;padding:1px 8px;border:1px solid var(--line);border-radius:999px;font-size:.7rem}
   .err{color:var(--low)}
-  @media(prefers-reduced-motion:no-preference){.bf{transition:width .25s}}
 </style>
 </head>
 <body>
@@ -60,25 +62,28 @@
     <button type="button" data-k="Kendari" aria-pressed="false">Kendari</button>
     <button type="button" data-k="Gorontalo" aria-pressed="false">Gorontalo</button>
   </div>
+  <div class="po">
+    <label for="tdoi">Suggest PO untuk DOI</label>
+    <input type="number" id="tdoi" inputmode="numeric" min="1" max="365" step="1" value="30">
+    <span>hari</span>
+  </div>
   <p class="take" id="take"></p>
   <div class="tiles">
     <div class="card tile"><span class="lbl">Stock</span><span class="big" id="ts">-</span><span class="sm" id="tsd"></span></div>
     <div class="card tile"><span class="lbl">Avg selling out per bulan</span><span class="big" id="ta">-</span><span class="sm" id="tad"></span></div>
+    <div class="card tile"><span class="lbl">Suggest PO</span><span class="big" id="tp">-</span><span class="sm" id="tpd"></span></div>
     <div class="card tile" id="tdc"><span class="lbl">DOI</span><span class="big" id="td">-</span><span class="sm" id="tds">Stock ÷ Avg × 30 hari</span></div>
   </div>
   <section class="card">
     <h2>Item summary</h2>
     <p class="note" id="legend"></p>
     <div class="chips" id="chips"></div>
+    <input type="search" id="q" class="srch" placeholder="Cari nama item…" autocomplete="off" enterkeyhint="search" aria-label="Cari item">
+    <p class="note" id="qn"></p>
     <div class="scroll"><table>
-      <thead><tr><th>Item</th><th>Tipe</th><th>Sat</th><th>Stock</th><th>Avg / bln</th><th>DOI</th><th id="m1"></th><th id="m2"></th><th id="m3"></th><th>Avg Rp / bln</th></tr></thead>
+      <thead><tr><th>Item</th><th>Tipe</th><th>Sat</th><th>Stock</th><th>Avg / bln</th><th>DOI</th><th>Suggest PO</th><th id="m1"></th><th id="m2"></th><th id="m3"></th><th>Avg Rp / bln</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
-  </section>
-  <section class="card">
-    <h2>10 item terlaris</h2>
-    <p class="note">Rata-rata penjualan (Rp) per bulan, supaya item CTN dan PCS bisa dibandingkan</p>
-    <div class="bars" id="bars"></div>
   </section>
   <p class="foot" id="foot"></p>
 </main>
@@ -96,6 +101,9 @@ const nf=new Intl.NumberFormat('id-ID',{maximumFractionDigits:0});
 const n1=new Intl.NumberFormat('id-ID',{maximumFractionDigits:1});
 // Satuan: HILO tetap PCS; lainnya CTN. 1 CTN = 720 pcs untuk NutriSari American Sweet Orange, Florida Orange, Jeruk Peras; selain itu 160 pcs.
 const unitOf=n=>/^HILO\b/i.test(n)?{u:'PCS',div:1}:/AMRCN SWT ORANG|FLORIDA ORANGE|JERUK PERAS/i.test(n)?{u:'CTN',div:720}:{u:'CTN',div:160};
+let target=30;
+try{const v=+localStorage.getItem('targetDoi');if(v>=1&&v<=365)target=Math.round(v)}catch(e){}
+const poOf=(avg,stock)=>avg>0?Math.max(0,Math.ceil(avg*target/30-stock-1e-9)):0;
 const fq=(v,u)=>(u==='CTN'?n1:nf).format(v);
 const cf=new Intl.NumberFormat('id-ID',{notation:'compact',maximumFractionDigits:1});
 const dlbl=d=>+d.slice(8)+' '+BLN[+d.slice(5,7)]+' '+d.slice(0,4);
@@ -136,7 +144,7 @@ function rowsOf(k){
   const n=D.months.length;
   return D.items.map(o=>{
     const {u,div}=unitOf(o.n),d=o.d[k]||[0,0,0,0,0,0],avg=(d[0]+d[1]+d[2])/n/div,stock=(o.s[k]||0)/div,prev=D.prevDate?(o.p[k]||0)/div:null;
-    return{n:o.n,t:o.t,u,q:d.slice(0,3).map(v=>v/div),avg,ar:(d[3]+d[4]+d[5])/n,stock,doi:doi(stock,avg),prev:prev==null?null:doi(prev,avg),st:status(stock,avg)};
+    return{n:o.n,t:o.t,u,q:d.slice(0,3).map(v=>v/div),avg,ar:(d[3]+d[4]+d[5])/n,stock,doi:doi(stock,avg),po:poOf(avg,stock),prev:prev==null?null:doi(prev,avg),st:status(stock,avg)};
   }).filter(r=>r.st).sort((a,b)=>b.ar-a.ar||b.stock-a.stock);
 }
 function render(){
@@ -144,31 +152,33 @@ function render(){
   const r=rowsOf(kota),c=r.filter(x=>x.u==='CTN'),h=r.filter(x=>x.u==='PCS');
   const sum=(a,f)=>a.reduce((s,x)=>s+x[f],0);
   const stock=sum(c,'stock'),avg=sum(c,'avg'),tot=doi(stock,avg),ts=status(stock,avg);
-  const hs=sum(h,'stock'),ha=sum(h,'avg'),hd=doi(hs,ha);
+  const hs=sum(h,'stock'),ha=sum(h,'avg'),hd=doi(hs,ha),pc=sum(c,'po'),ph=sum(h,'po');
   $('sub').textContent='Item RCG dan SCT · avg '+D.months.map(m=>BLN[+m.slice(5)]).join(', ')+' '+D.months[D.months.length-1].slice(0,4)+' · stok per '+(D.stokDate?dlbl(D.stokDate):'-')+' · Indogrosir + SPI';
   const top=r[0];
   $('take').replaceChildren(el('b',null,kota),document.createTextNode(' paling laku '),el('b',null,top?top.n:'-'),document.createTextNode(' (nilai rupiah), DOI item CTN '+fdoi(tot)+'.'));
   $('ts').textContent=n1.format(stock);$('tsd').textContent='CTN, update '+(D.stokDate?dlbl(D.stokDate):'-')+(h.length?' · HILO '+nf.format(hs)+' pcs':'');
   $('ta').textContent=n1.format(avg);$('tad').textContent='CTN per bulan, '+D.months.length+' bulan terakhir'+(h.length?' · HILO '+nf.format(ha)+' pcs':'');
+  $('tp').textContent=nf.format(pc);$('tpd').textContent='CTN agar DOI '+target+' hari'+(h.length?' · HILO '+nf.format(ph)+' pcs':'');
   $('td').textContent=fdoi(tot);$('tds').textContent='Stock ÷ Avg × 30 hari'+(h.length?' · HILO '+fdoi(hd):'');$('tdc').className='card tile '+(ts?'s-'+ts:'');
   D.months.forEach((m,i)=>$('m'+(i+1)).textContent=BLN[+m.slice(5)]);
-  $('legend').textContent='Warna mengikuti DOI: kurang < '+T.low+' hari, waspada '+T.low+' sampai '+T.warn+', aman '+T.warn+' sampai '+T.high+', berlebih > '+T.high+' hari. Item tanpa penjualan tapi masih ada stok ditandai abu-abu.';
-  const cnt={};r.forEach(x=>cnt[x.st]=(cnt[x.st]||0)+1);
+  $('legend').textContent='Suggest PO = Avg × DOI target ÷ 30 − Stock, dibulatkan ke atas per satuan (CTN, HILO pcs). Belum memperhitungkan barang dalam perjalanan atau PO yang sudah jalan. Warna mengikuti DOI: kurang < '+T.low+' hari, waspada '+T.low+' sampai '+T.warn+', aman '+T.warn+' sampai '+T.high+', berlebih > '+T.high+' hari. Item tanpa penjualan tapi masih ada stok ditandai abu-abu.';
+  const qs=$('q').value.trim().toLowerCase(),rr=qs?r.filter(x=>x.n.toLowerCase().includes(qs)):r;
+  $('qn').textContent=qs?rr.length+' dari '+r.length+' item cocok dengan "'+$('q').value.trim()+'"':'';
+  const cnt={};rr.forEach(x=>cnt[x.st]=(cnt[x.st]||0)+1);
   $('chips').replaceChildren(...['low','warn','ok','high','idle'].filter(s=>cnt[s]).map(s=>{const c=el('span','chip s-'+s);c.append(NAME[s]+' ',el('b',null,cnt[s]));return c}));
-  $('rows').replaceChildren(...r.map(x=>{
+  $('rows').replaceChildren(...rr.map(x=>{
+    const poCell=x=>el('td','po-c'+(x.po?'':' z'),x.po?nf.format(x.po):'-');
     const tr=el('tr'),tp=el('td','t'),cell=(txt,sub)=>{const td=el('td','c s-'+x.st,txt);if(sub){td.append(el('small',null,sub))}return td};
     tp.append(el('span','pill',x.t));const su=el('td','t');su.append(el('span','pill',x.u));
     const sub=x.prev==null?null:'sebelumnya '+fdoi(x.prev);
-    tr.append(el('td',null,x.n),tp,su,cell(fq(x.stock,x.u)),cell(fq(x.avg,x.u)),cell(fdoi(x.doi),sub),...x.q.map(v=>el('td',null,fq(v,x.u))),el('td',null,'Rp '+nf.format(x.ar)));
+    tr.append(el('td',null,x.n),tp,su,cell(fq(x.stock,x.u)),cell(fq(x.avg,x.u)),cell(fdoi(x.doi),sub),poCell(x),...x.q.map(v=>el('td',null,fq(v,x.u))),el('td',null,'Rp '+nf.format(x.ar)));
     return tr;
-  }));
-  const max=r.length?Math.max(...r.map(x=>x.ar)):1;
-  $('bars').replaceChildren(...r.slice(0,10).map(x=>{
-    const row=el('div'),t=el('div','bt'),f=el('div','bf');f.style.width='calc((100% - 7rem) * '+(x.ar/max)+')';
-    t.append(f,el('span','bv','Rp '+cf.format(x.ar)+' · '+fq(x.avg,x.u)+' '+x.u.toLowerCase()));row.append(el('div','bn',x.n),t);return row;
   }));
   $('foot').textContent='Terakhir upload: selling out '+(D.lastSo?wita(D.lastSo):'-')+' · stok '+(D.lastSt?wita(D.lastSt):'-')+'. Sumber: laporan Selling Out PD dan Stock Baik (Indogrosir dan SPI). Satuan: semua CTN kecuali HILO (PCS). 1 CTN = 720 pcs untuk NutriSari American Sweet Orange, Florida Orange, dan Jeruk Peras, selain itu 160 pcs. Avg dibagi jumlah bulan, termasuk bulan tanpa penjualan. Cabang SPI bertambah sepanjang 2026, jadi bulan awal tidak sepenuhnya setara.';
 }
+$('q').addEventListener('input',render);
+$('tdoi').value=target;
+$('tdoi').addEventListener('input',e=>{const v=Math.round(+e.target.value);if(!(v>=1&&v<=365))return;target=v;try{localStorage.setItem('targetDoi',String(v))}catch(x){}render()});
 $('seg').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;kota=b.dataset.k;
   document.querySelectorAll('#seg button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));render();
