@@ -64,7 +64,7 @@ const $=id=>document.getElementById(id);
 const nf=new Intl.NumberFormat('id-ID',{maximumFractionDigits:0});
 const lbl=m=>BLN[+m.slice(5)]+' '+m.slice(0,4);
 const EN={JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
-let meta={months:{},snaps:{}},queue=[],xlsxP=null;
+let meta={months:{},stok:null},queue=[],xlsxP=null;
 
 async function get(p){const r=await fetch(DB+'/'+p+'?key='+K);if(r.status===404)return null;if(!r.ok)throw new Error('Baca '+p+' gagal ('+r.status+')');return r.json()}
 async function patch(p,fields){const r=await fetch(DB+'/'+p+'?key='+K,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields})});if(!r.ok)throw new Error('Simpan '+p+' gagal ('+r.status+(r.status===429?', kuota harian habis':'')+')')}
@@ -74,13 +74,15 @@ const wita=iso=>iso?new Date(iso).toLocaleString('id-ID',{timeZone:'Asia/Makassa
 const dlbl=d=>+d.slice(8)+' '+BLN[+d.slice(5,7)]+' '+d.slice(0,4);
 const latest=o=>Object.values(o).map(x=>x.at).sort().pop();
 async function loadMeta(){
-  const [a,b]=await Promise.all([get('so_meta'),get('stok_meta')]);
-  meta={months:a&&a.fields&&a.fields.months?JSON.parse(a.fields.months.stringValue):{},snaps:b&&b.fields&&b.fields.snaps?JSON.parse(b.fields.snaps.stringValue):{}};
-  const mk=Object.keys(meta.months).sort(),sk=Object.keys(meta.snaps).sort(),box=$('cur');box.replaceChildren();
-  const line=(t,v,at)=>{const p=document.createElement('p');p.style.margin='0 0 6px';p.append(t+' ',Object.assign(document.createElement('b'),{textContent:v}),at?' · upload terakhir '+wita(at):'');box.append(p)};
-  if(!mk.length&&!sk.length){box.textContent='Database masih kosong.';return}
-  if(mk.length)line('Selling out:',lbl(mk[0])+' sampai '+lbl(mk[mk.length-1])+' ('+mk.length+' bulan)',latest(meta.months));
-  if(sk.length)line('Stok:','update '+dlbl(sk[sk.length-1])+' ('+sk.length+' tanggal)',latest(meta.snaps));
+  const [a,b]=await Promise.all([get('so_meta'),get('stok_terkini')]);
+  const f=b&&b.fields,iv=k=>f&&f[k]&&f[k].integerValue!=null?+f[k].integerValue:0;
+  meta={months:a&&a.fields&&a.fields.months?JSON.parse(a.fields.months.stringValue):{},
+    stok:f&&f.tanggal?{tanggal:f.tanggal.stringValue,n:iv('n'),q:+(f.q&&f.q.stringValue||0),at:f.at&&f.at.stringValue,file:f.file&&f.file.stringValue}:null};
+  const mk=Object.keys(meta.months).sort(),box=$('cur');box.replaceChildren();
+  const line=(t,v,at,x)=>{const p=document.createElement('p');p.style.margin='0 0 6px';p.append(t+' ',Object.assign(document.createElement('b'),{textContent:v}),(x||'')+' · upload terakhir '+wita(at));box.append(p)};
+  if(!mk.length&&!meta.stok){box.textContent='Database masih kosong.';return}
+  if(mk.length)line('Selling out:',lbl(mk[0])+' sampai '+lbl(mk[mk.length-1])+' ('+mk.length+' bulan, bertambah tiap import)',latest(meta.months));
+  if(meta.stok)line('Stok:','update '+dlbl(meta.stok.tanggal),meta.stok.at,' (diganti tiap import)');
 }
 function xlsx(){
   if(window.XLSX)return Promise.resolve();
@@ -137,20 +139,25 @@ $('f').addEventListener('change',async e=>{
   $('prev').hidden=false;$('list').replaceChildren();$('go').disabled=true;$('pnote').textContent='Membaca file…';
   queue=[];
   try{await xlsx()}catch(x){$('pnote').textContent=x.message;return}
-  const byMonth=new Map(),METAOF=t=>t==='so'?meta.months:meta.snaps;
+  const byMonth=new Map();
   for(const f of files){
     try{const p=parse(await f.arrayBuffer());p.file=f.name;
-      const id=p.type+p.key,prev=byMonth.get(id);
-      if(prev&&prev.qty>=p.qty){prev.dup=(prev.dup||0)+1;continue}   // file periode sama: pakai yang terbesar
+      // selling out: satu file per bulan (yang terbesar). stok: hanya satu yang disimpan, yang tanggalnya terbaru.
+      const id=p.type==='so'?'so'+p.key:'stok',prev=byMonth.get(id);
+      const better=!prev||(p.type==='so'?p.qty>prev.qty:p.key>prev.key||(p.key===prev.key&&p.qty>prev.qty));
+      if(!better){prev.dup=(prev.dup||0)+1;continue}
+      if(prev)p.dup=(prev.dup||0)+1;
       byMonth.set(id,p);
     }catch(x){queue.push({file:f.name,error:x.message})}
   }
   const ok=[...byMonth.values()].sort((a,b)=>a.type+a.key<b.type+b.key?-1:1);
   for(const p of ok){
-    const cur=METAOF(p.type)[p.key];
     p.json=JSON.stringify(p.rows);
+    const cur=p.type==='so'?meta.months[p.key]:(meta.stok&&meta.stok.tanggal===p.key?meta.stok:null);
     if(cur&&cur.q===p.qty&&cur.n===p.rows.length){p.status='same'}
+    else if(p.type==='stok'&&meta.stok&&p.key<meta.stok.tanggal){p.status='older'}
     else if(cur&&p.type==='so'&&p.qty<cur.q*.5){p.status='small'}
+    else if(p.type==='stok'&&meta.stok){p.status='replace'}
     else p.status=cur?'replace':'new';
     queue.push(p);
   }
@@ -166,11 +173,12 @@ function render(){
     else{
       nm.textContent=(p.type==='so'?'Selling out '+lbl(p.key):'Stok '+dlbl(p.key))+' · '+p.file;
       const base=p.cabang+' cabang · '+p.items+' item · QTY '+nf.format(p.qty)+(p.dup?' · '+p.dup+' file lain di bulan ini dilewati':'');
-      const cur=(p.type==='so'?meta.months:meta.snaps)[p.key];
-      if(p.status==='same'){cb.disabled=true;st.className='st';st.textContent='Sudah ada dan sama, tidak perlu disimpan. '+base}
+      const cur=p.type==='so'?meta.months[p.key]:meta.stok;
+      if(p.status==='older'){st.className='st warn';st.textContent='Lebih lama dari stok yang tersimpan ('+dlbl(cur.tanggal)+'). Centang kalau mau tetap menggantinya. '+base}
+      else if(p.status==='same'){cb.disabled=true;st.className='st';st.textContent='Sudah ada dan sama, tidak perlu disimpan. '+base}
       else if(p.status==='small'){st.className='st warn';st.textContent='Lebih kecil dari yang tersimpan (QTY '+nf.format(cur.q)+'), kemungkinan file lama. Centang kalau mau tetap mengganti. '+base}
-      else if(p.status==='replace'){cb.checked=true;st.className='st warn';st.textContent='Mengganti data '+(p.type==='so'?'bulan':'tanggal')+' ini yang sudah ada (QTY '+nf.format(cur.q)+'). '+base}
-      else{cb.checked=true;st.className='st ok';st.textContent=(p.type==='so'?'Bulan baru. ':'Tanggal baru. ')+base}
+      else if(p.status==='replace'){cb.checked=true;st.className='st warn';st.textContent=(p.type==='so'?'Mengganti data bulan ini yang sudah ada (QTY '+nf.format(cur.q)+'). ':'Menggantikan stok '+dlbl(cur.tanggal)+' (stok tidak ditumpuk). ')+base}
+      else{cb.checked=true;st.className='st ok';st.textContent=(p.type==='so'?'Bulan baru. ':'Stok pertama. ')+base}
     }
     cb.addEventListener('change',upd);li.append(cb,nm,st);ul.append(li);
   });
@@ -190,11 +198,14 @@ $('go').addEventListener('click',async()=>{
       const so=p.type==='so',name=so?lbl(p.key):dlbl(p.key),now=new Date().toISOString();
       $('pnote').textContent='Menyimpan '+name+'…';
       if(p.json.length>900000)throw new Error(name+' terlalu besar untuk satu dokumen');
-      await patch((so?'so_':'stok_')+p.key,{[so?'bulan':'tanggal']:sv(p.key),data:sv(p.json),n:{integerValue:String(p.rows.length)},file:sv(p.file),at:sv(now)});
-      const mp=so?'so_meta':'stok_meta',fld=so?'months':'snaps',d=await get(mp);
-      const cur=d&&d.fields&&d.fields[fld]?JSON.parse(d.fields[fld].stringValue):{};
-      cur[p.key]={n:p.rows.length,q:p.qty,at:now,file:p.file};
-      await patch(mp,{[fld]:sv(JSON.stringify(cur)),updatedAt:sv(now)});
+      if(so){
+        await patch('so_'+p.key,{bulan:sv(p.key),data:sv(p.json),n:{integerValue:String(p.rows.length)},file:sv(p.file),at:sv(now)});
+        const d=await get('so_meta'),cur=d&&d.fields&&d.fields.months?JSON.parse(d.fields.months.stringValue):{};
+        cur[p.key]={n:p.rows.length,q:p.qty,at:now,file:p.file};
+        await patch('so_meta',{months:sv(JSON.stringify(cur)),updatedAt:sv(now)});
+      }else{
+        await patch('stok_terkini',{tanggal:sv(p.key),data:sv(p.json),n:{integerValue:String(p.rows.length)},q:sv(p.qty),file:sv(p.file),at:sv(now)});
+      }
       out.push((so?'selling out ':'stok ')+name);
     }
     await loadMeta();

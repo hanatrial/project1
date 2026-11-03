@@ -119,12 +119,10 @@ const field=(d,f)=>d&&d.fields&&d.fields[f]?d.fields[f].stringValue:null;
 
 let D=null,kota='Manado';
 async function load(){
-  const [sm,tm]=await Promise.all([get('so_meta'),get('stok_meta')]);
-  const months=Object.keys(JSON.parse(field(sm,'months')||'{}')).sort().slice(-3);
-  const metaSo=JSON.parse(field(sm,'months')||'{}'),metaSt=JSON.parse(field(tm,'snaps')||'{}');
-  const snaps=Object.keys(metaSt).sort().slice(-2);
+  const [sm,stk]=await Promise.all([get('so_meta'),get('stok_terkini')]);
+  const metaSo=JSON.parse(field(sm,'months')||'{}'),months=Object.keys(metaSo).sort().slice(-3);
   if(!months.length)throw new Error('Belum ada data selling out. Import dulu lewat halaman import.');
-  const [so,st]=await Promise.all([Promise.all(months.map(m=>get('so_'+m))),Promise.all(snaps.map(s=>get('stok_'+s)))]);
+  const so=await Promise.all(months.map(m=>get('so_'+m)));
   const items=new Map();
   const slot=(kode,name)=>{const t=(name.match(/\b(RCG|SCT)\b/)||[])[1];if(!t)return null;const key=kode+'|'+name;let o=items.get(key);
     if(!o){o={n:name,t,kode,s:{},p:{},d:{}};items.set(key,o)}return o};
@@ -134,19 +132,18 @@ async function load(){
   }));
   // stok dicocokkan lewat kode item
   const byCode=new Map();items.forEach(o=>{if(!byCode.has(o.kode))byCode.set(o.kode,o)});
-  st.forEach((d,si)=>JSON.parse(field(d,'data')).forEach(([cab,kode,name,q])=>{
+  if(stk)JSON.parse(field(stk,'data')).forEach(([cab,kode,name,q])=>{
     const k=kotaOf(cab);if(!k)return;const o=byCode.get(kode)||slot(kode,name);if(!o)return;
-    const tgt=si===st.length-1?o.s:o.p;tgt[k]=(tgt[k]||0)+q;
-  }));
-  const ats=[...months.map(m=>metaSo[m].at),...snaps.map(s=>metaSt[s].at)];
-  D={months,items:[...items.values()],stokDate:snaps[snaps.length-1]||null,prevDate:snaps.length>1?snaps[0]:null,
-     lastSo:Object.values(metaSo).map(x=>x.at).sort().pop(),lastSt:Object.values(metaSt).map(x=>x.at).sort().pop()};
+    o.s[k]=(o.s[k]||0)+q;
+  });
+  D={months,items:[...items.values()],stokDate:stk?field(stk,'tanggal'):null,
+     lastSo:Object.values(metaSo).map(x=>x.at).sort().pop(),lastSt:stk?field(stk,'at'):null};
 }
 function rowsOf(k){
   const n=D.months.length;
   return D.items.map(o=>{
-    const {u,div}=unitOf(o.n),d=o.d[k]||[0,0,0,0,0,0],avg=(d[0]+d[1]+d[2])/n/div,stock=(o.s[k]||0)/div,prev=D.prevDate?(o.p[k]||0)/div:null;
-    return{n:o.n,t:o.t,u,q:d.slice(0,3).map(v=>v/div),avg,ar:(d[3]+d[4]+d[5])/n,stock,doi:doi(stock,avg),po:poOf(avg,stock),prev:prev==null?null:doi(prev,avg),st:status(stock,avg)};
+    const {u,div}=unitOf(o.n),d=o.d[k]||[0,0,0,0,0,0],avg=(d[0]+d[1]+d[2])/n/div,stock=(o.s[k]||0)/div;
+    return{n:o.n,t:o.t,u,q:d.slice(0,3).map(v=>v/div),avg,ar:(d[3]+d[4]+d[5])/n,stock,doi:doi(stock,avg),po:poOf(avg,stock),st:status(stock,avg)};
   }).filter(r=>r.st).sort((a,b)=>grp(a.n)-grp(b.n)||b.ar-a.ar||b.stock-a.stock);
 }
 function render(){
@@ -172,8 +169,7 @@ function render(){
     const poCell=x=>el('td','po-c'+(x.po?'':' z'),x.po?nf.format(x.po):'-');
     const tr=el('tr'),tp=el('td','t'),cell=(txt,sub)=>{const td=el('td','c s-'+x.st,txt);if(sub){td.append(el('small',null,sub))}return td};
     tp.append(el('span','pill',x.t));const su=el('td','t');su.append(el('span','pill',x.u));
-    const sub=x.prev==null?null:'sebelumnya '+fdoi(x.prev);
-    tr.append(el('td',null,x.n),tp,su,cell(fq(x.stock,x.u)),cell(fq(x.avg,x.u)),cell(fdoi(x.doi),sub),poCell(x),...x.q.map(v=>el('td',null,fq(v,x.u))),el('td',null,'Rp '+nf.format(x.ar)));
+    tr.append(el('td',null,x.n),tp,su,cell(fq(x.stock,x.u)),cell(fq(x.avg,x.u)),cell(fdoi(x.doi)),poCell(x),...x.q.map(v=>el('td',null,fq(v,x.u))),el('td',null,'Rp '+nf.format(x.ar)));
     return tr;
   }));
   $('foot').textContent='Terakhir upload: selling out '+(D.lastSo?wita(D.lastSo):'-')+' · stok '+(D.lastSt?wita(D.lastSt):'-')+'. Sumber: laporan Selling Out PD dan Stock Baik (Indogrosir dan SPI). Satuan: semua CTN kecuali HILO (PCS). 1 CTN = 720 pcs untuk NutriSari American Sweet Orange, Florida Orange, dan Jeruk Peras, selain itu 160 pcs. Avg dibagi jumlah bulan, termasuk bulan tanpa penjualan. Cabang SPI bertambah sepanjang 2026, jadi bulan awal tidak sepenuhnya setara.';
