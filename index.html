@@ -103,8 +103,13 @@ const kotaOf=c=>{c=c.toUpperCase();for(const [re,k] of KOTA)if(re.test(c))return
 const $=id=>document.getElementById(id);
 const nf=new Intl.NumberFormat('id-ID',{maximumFractionDigits:0});
 const n1=new Intl.NumberFormat('id-ID',{maximumFractionDigits:1});
-// Satuan: HILO tetap PCS; lainnya CTN. 1 CTN = 720 pcs untuk NutriSari American Sweet Orange, Florida Orange, Jeruk Peras; selain itu 160 pcs.
-const unitOf=n=>/^HILO\b/i.test(n)?{u:'PCS',div:1}:/AMRCN SWT ORANG|FLORIDA ORANGE|JERUK PERAS/i.test(n)?{u:'CTN',div:720}:{u:'CTN',div:160};
+// Isi per CTN (pcs). NutriSari: 720 untuk American Sweet Orange, Florida Orange, Jeruk Peras; 160 untuk sisanya.
+// HILO per item (urutan penting: pola yang lebih spesifik dulu). HILO yang belum terdaftar tetap PCS supaya kelihatan belum dikonversi.
+const HILO_CTN=[[/SWISS CHOCOLATE SCT/i,120],[/CHOCOLATE SCT/i,150],[/SCHOOL.*RCG/i,12],[/CHOCO MALT RCG/i,8],[/CHOCO HAZELNUT RCG/i,12],[/TEH TARIK.*RCG/i,8],[/SWISS CHOCOLATE RCG/i,12],[/TARO.*RCG/i,15],[/AVOCADO CHOCO RCG/i,15]];
+const unitOf=n=>{
+  if(/^HILO\b/i.test(n)){const m=HILO_CTN.find(x=>x[0].test(n));return m?{u:'CTN',div:m[1]}:{u:'PCS',div:1}}
+  return /AMRCN SWT ORANG|FLORIDA ORANGE|JERUK PERAS/i.test(n)?{u:'CTN',div:720}:{u:'CTN',div:160};
+};
 let target=30;
 try{const v=+localStorage.getItem('targetDoi');if(v>=1&&v<=365)target=Math.round(v)}catch(e){}
 const poOf=(avg,stock)=>avg>0?Math.max(0,Math.ceil(avg*target/30-stock-1e-9)):0;
@@ -164,7 +169,7 @@ function render(){
   $('tp').textContent=nf.format(pc);$('tpd').textContent='CTN agar DOI '+target+' hari'+(h.length?' · HILO '+nf.format(ph)+' pcs':'');
   $('td').textContent=fdoi(tot);$('tds').textContent='Stock ÷ Avg × 30 hari'+(h.length?' · HILO '+fdoi(hd):'');$('tdc').className='card tile '+(ts?'s-'+ts:'');
   D.months.forEach((m,i)=>$('m'+(i+1)).textContent=BLN[+m.slice(5)]);
-  $('legend').textContent='Suggest PO = Avg × DOI target ÷ 30 − Stock, dibulatkan ke atas per satuan (CTN, HILO pcs). Belum memperhitungkan barang dalam perjalanan atau PO yang sudah jalan. Warna mengikuti DOI: kurang < '+T.low+' hari, waspada '+T.low+' sampai '+T.warn+', aman '+T.warn+' sampai '+T.high+', berlebih > '+T.high+' hari. Item tanpa penjualan tapi masih ada stok ditandai abu-abu.';
+  $('legend').textContent='Suggest PO = Avg × DOI target ÷ 30 − Stock, dibulatkan ke atas per CTN. Belum memperhitungkan barang dalam perjalanan atau PO yang sudah jalan. Warna mengikuti DOI: kurang < '+T.low+' hari, waspada '+T.low+' sampai '+T.warn+', aman '+T.warn+' sampai '+T.high+', berlebih > '+T.high+' hari. Item tanpa penjualan tapi masih ada stok ditandai abu-abu.';
   const qs=$('q').value.trim().toLowerCase(),rr=qs?r.filter(x=>x.n.toLowerCase().includes(qs)):r;
   $('qn').textContent=qs?rr.length+' dari '+r.length+' item cocok dengan "'+$('q').value.trim()+'"':'';
   const cnt={};rr.forEach(x=>cnt[x.st]=(cnt[x.st]||0)+1);
@@ -176,7 +181,7 @@ function render(){
     tr.append(el('td',null,x.n),tp,su,cell(fq(x.stock,x.u)),cell(fq(x.avg,x.u)),cell(fdoi(x.doi)),poCell(x),...x.q.map(v=>el('td',null,fq(v,x.u))),el('td',null,'Rp '+nf.format(x.ar)));
     return tr;
   }));
-  $('foot').textContent='Terakhir upload: selling out '+(D.lastSo?wita(D.lastSo):'-')+' · stok '+(D.lastSt?wita(D.lastSt):'-')+'. Sumber: laporan Selling Out PD dan Stock Baik (Indogrosir dan SPI). Satuan: semua CTN kecuali HILO (PCS). 1 CTN = 720 pcs untuk NutriSari American Sweet Orange, Florida Orange, dan Jeruk Peras, selain itu 160 pcs. Avg dibagi jumlah bulan, termasuk bulan tanpa penjualan. Cabang SPI bertambah sepanjang 2026, jadi bulan awal tidak sepenuhnya setara.';
+  $('foot').textContent='Terakhir upload: selling out '+(D.lastSo?wita(D.lastSo):'-')+' · stok '+(D.lastSt?wita(D.lastSt):'-')+'. Sumber: laporan Selling Out PD dan Stock Baik (Indogrosir dan SPI). Satuan CTN. NutriSari: 1 CTN = 720 pcs untuk American Sweet Orange, Florida Orange, dan Jeruk Peras, selain itu 160 pcs. HILO per CTN: SCT Chocolate 150, SCT Swiss 120, RCG School 12, Choco Malt 8, Hazelnut 12, Teh Tarik 8, Swiss 12, Taro 15, Avocado 15 pcs. Avg dibagi jumlah bulan, termasuk bulan tanpa penjualan. Cabang SPI bertambah sepanjang 2026, jadi bulan awal tidak sepenuhnya setara.';
 }
 $('q').addEventListener('input',render);
 // ---- Export Excel: satu sheet per kota, isi dan warna sama dengan Item summary, kolom Kode di depan ----
