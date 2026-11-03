@@ -64,20 +64,20 @@
   <div class="tiles">
     <div class="card tile"><span class="lbl">Stock</span><span class="big" id="ts">-</span><span class="sm" id="tsd"></span></div>
     <div class="card tile"><span class="lbl">Avg selling out per bulan</span><span class="big" id="ta">-</span><span class="sm" id="tad"></span></div>
-    <div class="card tile" id="tdc"><span class="lbl">DOI</span><span class="big" id="td">-</span><span class="sm">Stock ÷ Avg × 30 hari</span></div>
+    <div class="card tile" id="tdc"><span class="lbl">DOI</span><span class="big" id="td">-</span><span class="sm" id="tds">Stock ÷ Avg × 30 hari</span></div>
   </div>
   <section class="card">
     <h2>Item summary</h2>
     <p class="note" id="legend"></p>
     <div class="chips" id="chips"></div>
     <div class="scroll"><table>
-      <thead><tr><th>Item</th><th>Tipe</th><th>Stock</th><th>Avg / bln</th><th>DOI</th><th id="m1"></th><th id="m2"></th><th id="m3"></th><th>Avg Rp / bln</th></tr></thead>
+      <thead><tr><th>Item</th><th>Tipe</th><th>Sat</th><th>Stock</th><th>Avg / bln</th><th>DOI</th><th id="m1"></th><th id="m2"></th><th id="m3"></th><th>Avg Rp / bln</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
   </section>
   <section class="card">
     <h2>10 item terlaris</h2>
-    <p class="note">Rata-rata QTY per bulan</p>
+    <p class="note">Rata-rata penjualan (Rp) per bulan, supaya item CTN dan PCS bisa dibandingkan</p>
     <div class="bars" id="bars"></div>
   </section>
   <p class="foot" id="foot"></p>
@@ -93,6 +93,10 @@ const KOTA=[[/GORONTALO/,'Gorontalo'],[/MAKASS?AR/,'Makassar'],[/MANADO/,'Manado
 const kotaOf=c=>{c=c.toUpperCase();for(const [re,k] of KOTA)if(re.test(c))return k;return null};
 const $=id=>document.getElementById(id);
 const nf=new Intl.NumberFormat('id-ID',{maximumFractionDigits:0});
+const n1=new Intl.NumberFormat('id-ID',{maximumFractionDigits:1});
+// Satuan: HILO tetap PCS; lainnya CTN. 1 CTN = 720 pcs untuk NutriSari American Sweet Orange, Florida Orange, Jeruk Peras; selain itu 160 pcs.
+const unitOf=n=>/^HILO\b/i.test(n)?{u:'PCS',div:1}:/AMRCN SWT ORANG|FLORIDA ORANGE|JERUK PERAS/i.test(n)?{u:'CTN',div:720}:{u:'CTN',div:160};
+const fq=(v,u)=>(u==='CTN'?n1:nf).format(v);
 const cf=new Intl.NumberFormat('id-ID',{notation:'compact',maximumFractionDigits:1});
 const dlbl=d=>+d.slice(8)+' '+BLN[+d.slice(5,7)]+' '+d.slice(0,4);
 const wita=iso=>new Date(iso).toLocaleString('id-ID',{timeZone:'Asia/Makassar',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}).replace(/\./g,':')+' WITA';
@@ -131,36 +135,39 @@ async function load(){
 function rowsOf(k){
   const n=D.months.length;
   return D.items.map(o=>{
-    const d=o.d[k]||[0,0,0,0,0,0],avg=(d[0]+d[1]+d[2])/n,stock=o.s[k]||0,prev=D.prevDate?(o.p[k]||0):null;
-    return{n:o.n,t:o.t,q:d.slice(0,3),avg,ar:(d[3]+d[4]+d[5])/n,stock,doi:doi(stock,avg),prev:prev==null?null:doi(prev,avg),st:status(stock,avg)};
-  }).filter(r=>r.st).sort((a,b)=>b.avg-a.avg||b.stock-a.stock);
+    const {u,div}=unitOf(o.n),d=o.d[k]||[0,0,0,0,0,0],avg=(d[0]+d[1]+d[2])/n/div,stock=(o.s[k]||0)/div,prev=D.prevDate?(o.p[k]||0)/div:null;
+    return{n:o.n,t:o.t,u,q:d.slice(0,3).map(v=>v/div),avg,ar:(d[3]+d[4]+d[5])/n,stock,doi:doi(stock,avg),prev:prev==null?null:doi(prev,avg),st:status(stock,avg)};
+  }).filter(r=>r.st).sort((a,b)=>b.ar-a.ar||b.stock-a.stock);
 }
 function render(){
   if(!D)return;
-  const r=rowsOf(kota),stock=r.reduce((s,x)=>s+x.stock,0),avg=r.reduce((s,x)=>s+x.avg,0),tot=doi(stock,avg),ts=status(stock,avg);
+  const r=rowsOf(kota),c=r.filter(x=>x.u==='CTN'),h=r.filter(x=>x.u==='PCS');
+  const sum=(a,f)=>a.reduce((s,x)=>s+x[f],0);
+  const stock=sum(c,'stock'),avg=sum(c,'avg'),tot=doi(stock,avg),ts=status(stock,avg);
+  const hs=sum(h,'stock'),ha=sum(h,'avg'),hd=doi(hs,ha);
   $('sub').textContent='Item RCG dan SCT · avg '+D.months.map(m=>BLN[+m.slice(5)]).join(', ')+' '+D.months[D.months.length-1].slice(0,4)+' · stok per '+(D.stokDate?dlbl(D.stokDate):'-')+' · Indogrosir + SPI';
-  const top=[...r].sort((a,b)=>b.avg-a.avg)[0];
-  $('take').replaceChildren(el('b',null,kota),document.createTextNode(' paling laku '),el('b',null,top?top.n:'-'),document.createTextNode(', DOI keseluruhan '+fdoi(tot)+'.'));
-  $('ts').textContent=nf.format(stock);$('tsd').textContent='pcs, update '+(D.stokDate?dlbl(D.stokDate):'-');
-  $('ta').textContent=nf.format(avg);$('tad').textContent='pcs per bulan, '+D.months.length+' bulan terakhir';
-  $('td').textContent=fdoi(tot);$('tdc').className='card tile '+(ts?'s-'+ts:'');
+  const top=r[0];
+  $('take').replaceChildren(el('b',null,kota),document.createTextNode(' paling laku '),el('b',null,top?top.n:'-'),document.createTextNode(' (nilai rupiah), DOI item CTN '+fdoi(tot)+'.'));
+  $('ts').textContent=n1.format(stock);$('tsd').textContent='CTN, update '+(D.stokDate?dlbl(D.stokDate):'-')+(h.length?' · HILO '+nf.format(hs)+' pcs':'');
+  $('ta').textContent=n1.format(avg);$('tad').textContent='CTN per bulan, '+D.months.length+' bulan terakhir'+(h.length?' · HILO '+nf.format(ha)+' pcs':'');
+  $('td').textContent=fdoi(tot);$('tds').textContent='Stock ÷ Avg × 30 hari'+(h.length?' · HILO '+fdoi(hd):'');$('tdc').className='card tile '+(ts?'s-'+ts:'');
   D.months.forEach((m,i)=>$('m'+(i+1)).textContent=BLN[+m.slice(5)]);
   $('legend').textContent='Warna mengikuti DOI: kurang < '+T.low+' hari, waspada '+T.low+' sampai '+T.warn+', aman '+T.warn+' sampai '+T.high+', berlebih > '+T.high+' hari. Item tanpa penjualan tapi masih ada stok ditandai abu-abu.';
   const cnt={};r.forEach(x=>cnt[x.st]=(cnt[x.st]||0)+1);
   $('chips').replaceChildren(...['low','warn','ok','high','idle'].filter(s=>cnt[s]).map(s=>{const c=el('span','chip s-'+s);c.append(NAME[s]+' ',el('b',null,cnt[s]));return c}));
   $('rows').replaceChildren(...r.map(x=>{
     const tr=el('tr'),tp=el('td','t'),cell=(txt,sub)=>{const td=el('td','c s-'+x.st,txt);if(sub){td.append(el('small',null,sub))}return td};
-    tp.append(el('span','pill',x.t));
+    tp.append(el('span','pill',x.t));const su=el('td','t');su.append(el('span','pill',x.u));
     const sub=x.prev==null?null:'sebelumnya '+fdoi(x.prev);
-    tr.append(el('td',null,x.n),tp,cell(nf.format(x.stock)),cell(nf.format(x.avg)),cell(fdoi(x.doi),sub),...x.q.map(v=>el('td',null,nf.format(v))),el('td',null,'Rp '+nf.format(x.ar)));
+    tr.append(el('td',null,x.n),tp,su,cell(fq(x.stock,x.u)),cell(fq(x.avg,x.u)),cell(fdoi(x.doi),sub),...x.q.map(v=>el('td',null,fq(v,x.u))),el('td',null,'Rp '+nf.format(x.ar)));
     return tr;
   }));
-  const max=r.length?Math.max(...r.map(x=>x.avg)):1;
-  $('bars').replaceChildren(...[...r].sort((a,b)=>b.avg-a.avg).slice(0,10).map(x=>{
-    const row=el('div'),t=el('div','bt'),f=el('div','bf');f.style.width='calc((100% - 5rem) * '+(x.avg/max)+')';
-    t.append(f,el('span','bv',nf.format(x.avg)));row.append(el('div','bn',x.n),t);return row;
+  const max=r.length?Math.max(...r.map(x=>x.ar)):1;
+  $('bars').replaceChildren(...r.slice(0,10).map(x=>{
+    const row=el('div'),t=el('div','bt'),f=el('div','bf');f.style.width='calc((100% - 7rem) * '+(x.ar/max)+')';
+    t.append(f,el('span','bv','Rp '+cf.format(x.ar)+' · '+fq(x.avg,x.u)+' '+x.u.toLowerCase()));row.append(el('div','bn',x.n),t);return row;
   }));
-  $('foot').textContent='Terakhir upload: selling out '+(D.lastSo?wita(D.lastSo):'-')+' · stok '+(D.lastSt?wita(D.lastSt):'-')+'. Sumber: laporan Selling Out PD dan Stock Baik (Indogrosir dan SPI). Avg dibagi jumlah bulan, termasuk bulan tanpa penjualan. Cabang SPI bertambah sepanjang 2026, jadi bulan awal tidak sepenuhnya setara.';
+  $('foot').textContent='Terakhir upload: selling out '+(D.lastSo?wita(D.lastSo):'-')+' · stok '+(D.lastSt?wita(D.lastSt):'-')+'. Sumber: laporan Selling Out PD dan Stock Baik (Indogrosir dan SPI). Satuan: semua CTN kecuali HILO (PCS). 1 CTN = 720 pcs untuk NutriSari American Sweet Orange, Florida Orange, dan Jeruk Peras, selain itu 160 pcs. Avg dibagi jumlah bulan, termasuk bulan tanpa penjualan. Cabang SPI bertambah sepanjang 2026, jadi bulan awal tidak sepenuhnya setara.';
 }
 $('seg').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;kota=b.dataset.k;
