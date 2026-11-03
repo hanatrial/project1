@@ -65,7 +65,7 @@ const nf=new Intl.NumberFormat('id-ID',{maximumFractionDigits:0});
 const lbl=m=>BLN[+m.slice(5)]+' '+m.slice(0,4);
 const EN={JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
 let meta={months:{},stok:null,po:null},queue=[],xlsxP=null;
-const DOCS={stok:'stok_terkini',po:'po_aktif'},NAMES={so:'Selling out',stok:'Stok',po:'PO aktif'};
+const DOCS={stok:'stok_terkini',po:'po_terkini'},NAMES={so:'Selling out',stok:'Stok',po:'PO'};
 
 async function get(p){const r=await fetch(DB+'/'+p+'?key='+K);if(r.status===404)return null;if(!r.ok)throw new Error('Baca '+p+' gagal ('+r.status+')');return r.json()}
 async function patch(p,fields){const r=await fetch(DB+'/'+p+'?key='+K,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields})});if(!r.ok)throw new Error('Simpan '+p+' gagal ('+r.status+(r.status===429?', kuota harian habis':'')+')')}
@@ -75,7 +75,7 @@ const wita=iso=>iso?new Date(iso).toLocaleString('id-ID',{timeZone:'Asia/Makassa
 const dlbl=d=>+d.slice(8)+' '+BLN[+d.slice(5,7)]+' '+d.slice(0,4);
 const latest=o=>Object.values(o).map(x=>x.at).sort().pop();
 async function loadMeta(){
-  const [a,b,c]=await Promise.all([get('so_meta'),get('stok_terkini'),get('po_aktif')]);
+  const [a,b,c]=await Promise.all([get('so_meta'),get('stok_terkini'),get('po_terkini')]);
   const one=d=>{const f=d&&d.fields;return f&&f.tanggal?{tanggal:f.tanggal.stringValue,n:f.n&&+f.n.integerValue||0,q:+(f.q&&f.q.stringValue||0),at:f.at&&f.at.stringValue,file:f.file&&f.file.stringValue}:null};
   meta={months:a&&a.fields&&a.fields.months?JSON.parse(a.fields.months.stringValue):{},stok:one(b),po:one(c)};
   const mk=Object.keys(meta.months).sort(),box=$('cur');box.replaceChildren();
@@ -83,7 +83,7 @@ async function loadMeta(){
   if(!mk.length&&!meta.stok&&!meta.po){box.textContent='Database masih kosong.';return}
   if(mk.length)line('Selling out:',lbl(mk[0])+' sampai '+lbl(mk[mk.length-1])+' ('+mk.length+' bulan, bertambah tiap import)',latest(meta.months));
   if(meta.stok)line('Stok:','update '+dlbl(meta.stok.tanggal),meta.stok.at,' (diganti tiap import)');
-  if(meta.po)line('PO aktif:','per '+dlbl(meta.po.tanggal),meta.po.at,' (diganti tiap import)');
+  if(meta.po)line('PO (aktif, expired, received):','per '+dlbl(meta.po.tanggal),meta.po.at,' (diganti tiap import)');
 }
 function xlsx(){
   if(window.XLSX)return Promise.resolve();
@@ -131,15 +131,15 @@ function parsePO(a){
   const h=(a[4]||[]).map(x=>x==null?'':String(x).trim().toUpperCase());
   const ix=n=>h.indexOf(n),C={br:ix('BRANCH NAME'),no:ix('PO NO.'),d:ix('PO DATE'),ex:ix('DATE EXPIRED'),id:ix('PRODUCT ID'),nm:ix('PRODUCT NAME'),q:ix('QTY PO'),v:ix('NILAI PO'),st:ix('STATUS')};
   if(Object.values(C).some(i=>i<0))throw new Error('Kolom PO tidak lengkap (perlu BRANCH NAME, PO No., PO DATE, DATE EXPIRED, PRODUCT ID, PRODUCT NAME, QTY PO, NILAI PO, STATUS)');
-  const rows=[];let total=0;
+  const rows=[];
   for(let i=5;i<a.length;i++){
     const r=a[i];if(!r||!r[C.br])continue;const cab=String(r[C.br]).replace(/^\s*\w+\s-\s/,'').trim();
-    if(!kotaOf(cab))continue;total++;
-    if(String(r[C.st]||'').trim().toUpperCase()!=='ACTIVE')continue;   // hanya PO yang masih aktif
-    rows.push([cab,String(r[C.id]).trim(),String(r[C.nm]||'').trim(),num(r[C.q]),num(r[C.v]),String(r[C.no]||'').trim(),toIso(r[C.d]),toIso(r[C.ex])]);
+    if(!kotaOf(cab))continue;
+    const stt=String(r[C.st]||'').trim().toUpperCase();
+    rows.push([cab,String(r[C.id]).trim(),String(r[C.nm]||'').trim(),num(r[C.q]),num(r[C.v]),String(r[C.no]||'').trim(),toIso(r[C.d]),toIso(r[C.ex]),stt]);
   }
-  if(!total)throw new Error('Tidak ada PO untuk cabang Manado, Makassar, Kendari, atau Gorontalo');
-  return{type:'po',key:date,rows,cabang:new Set(rows.map(r=>r[0])).size,items:new Set(rows.map(r=>r[1])).size,qty:rows.reduce((s,r)=>s+r[3],0),total};
+  if(!rows.length)throw new Error('Tidak ada PO untuk cabang Manado, Makassar, Kendari, atau Gorontalo');
+  return{type:'po',key:date,rows,cabang:new Set(rows.map(r=>r[0])).size,items:new Set(rows.map(r=>r[1])).size,qty:rows.reduce((s,r)=>s+r[3],0),stat:rows.reduce((o,r)=>(o[r[8]]=(o[r[8]]||0)+1,o),{})};
 }
 function parseStock(a){
   const t=String((a[2]&&a[2][0])||''),m=t.match(/\(\s*(\d{1,2})-(\w{3})-(\d{4})\s*\)/);
@@ -197,7 +197,7 @@ function render(){
     if(p.error){cb.disabled=true;nm.textContent=p.file;st.className='st bad';st.textContent='Dilewati: '+p.error}
     else{
       nm.textContent=(p.type==='so'?'Selling out '+lbl(p.key):NAMES[p.type]+' per '+dlbl(p.key))+' · '+p.file;
-      const base=(p.type==='po'?'PO aktif '+p.rows.length+' baris · ':'')+p.cabang+' cabang · '+p.items+' item · QTY '+nf.format(p.qty)+(p.dup?' · '+p.dup+' file lain di bulan ini dilewati':'');
+      const base=(p.type==='po'?p.rows.length+' baris PO ('+(p.stat.ACTIVE||0)+' aktif · '+(p.stat.EXPIRED||0)+' expired · '+(p.stat.RECEIVED||0)+' received) · ':'')+p.cabang+' cabang · '+p.items+' item · QTY '+nf.format(p.qty)+(p.dup?' · '+p.dup+' file lain di bulan ini dilewati':'');
       const cur=p.type==='so'?meta.months[p.key]:meta[p.type];
       if(p.status==='older'){st.className='st warn';st.textContent='Lebih lama dari '+NAMES[p.type].toLowerCase()+' yang tersimpan ('+dlbl(cur.tanggal)+'). Centang kalau mau tetap menggantinya. '+base}
       else if(p.status==='same'){cb.disabled=true;st.className='st';st.textContent='Sudah ada dan sama, tidak perlu disimpan. '+base}

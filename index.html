@@ -20,6 +20,13 @@
   .seg button[aria-pressed=true]{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc);font-weight:600}
   button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
   .take{margin:0}
+  .col{display:flex;flex-direction:column;gap:16px}
+  [hidden]{display:none!important}
+  .t2 th:first-child,.t2 td:first-child{min-width:0;white-space:nowrap;text-align:left}
+  .t2 td:nth-child(3){text-align:left;white-space:normal;min-width:9rem}
+  .t2 td:nth-child(4){text-align:left;white-space:normal;min-width:14rem}
+  .t2 td:nth-child(2){text-align:left}
+  .t2 td small{display:block;color:var(--mut);font-size:.72rem}
   .xbtn{font:inherit;font-weight:600;min-height:42px;margin-top:12px;padding:8px 16px;border-radius:10px;border:1px solid var(--acc);background:transparent;color:var(--acc);cursor:pointer}
   .xbtn:disabled{opacity:.5;cursor:default}
   .xbtn:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
@@ -61,12 +68,18 @@
     <h1>Selling Out dan DOI</h1>
     <p class="sub" id="sub">Memuat data…</p>
   </header>
+  <div class="seg" id="tabs" role="group" aria-label="Pilih tampilan">
+    <button type="button" data-v="sum" aria-pressed="true">Summary</button>
+    <button type="button" data-v="EXPIRED" aria-pressed="false">PO Expired</button>
+    <button type="button" data-v="RECEIVED" aria-pressed="false">PO Received</button>
+  </div>
   <div class="seg" id="seg" role="group" aria-label="Pilih kota">
     <button type="button" data-k="Manado" aria-pressed="true">Manado</button>
     <button type="button" data-k="Makassar" aria-pressed="false">Makassar</button>
     <button type="button" data-k="Kendari" aria-pressed="false">Kendari</button>
     <button type="button" data-k="Gorontalo" aria-pressed="false">Gorontalo</button>
   </div>
+  <div id="v-sum" class="col">
   <div class="po">
     <label for="tdoi">Suggest PO untuk DOI</label>
     <input type="number" id="tdoi" inputmode="numeric" min="1" max="365" step="1" value="30">
@@ -91,6 +104,26 @@
       <tbody id="rows"></tbody>
     </table></div>
   </section>
+  </div>
+  <div id="v-po" class="col" hidden>
+    <p class="take" id="ptake"></p>
+    <div class="tiles">
+      <div class="card tile"><span class="lbl">Jumlah PO</span><span class="big" id="pn">-</span></div>
+      <div class="card tile"><span class="lbl">Baris item</span><span class="big" id="pr">-</span></div>
+      <div class="card tile"><span class="lbl">Total QTY</span><span class="big" id="pq">-</span><span class="sm">pcs</span></div>
+      <div class="card tile"><span class="lbl">Nilai PO</span><span class="big" id="pv">-</span></div>
+    </div>
+    <section class="card">
+      <h2 id="ph"></h2>
+      <p class="note" id="pnote"></p>
+      <input type="search" id="q2" class="srch" placeholder="Cari item atau nomor PO…" autocomplete="off" enterkeyhint="search" aria-label="Cari item atau nomor PO">
+      <p class="note" id="qn2"></p>
+      <div class="scroll"><table class="t2">
+        <thead><tr><th>Tgl PO</th><th>PO No.</th><th>Cabang</th><th>Item</th><th>QTY pcs</th><th>QTY CTN</th><th>Nilai (Rp)</th><th>Expired</th></tr></thead>
+        <tbody id="prows"></tbody>
+      </table></div>
+    </section>
+  </div>
   <p class="foot" id="foot"></p>
 </main>
 <script>
@@ -128,9 +161,9 @@ function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className
 async function get(p){const r=await fetch(DB+'/'+p+'?key='+KEY);if(r.status===404)return null;if(!r.ok)throw new Error('Database tidak bisa dibaca ('+r.status+')');return r.json()}
 const field=(d,f)=>d&&d.fields&&d.fields[f]?d.fields[f].stringValue:null;
 
-let D=null,kota='Manado';
+let D=null,kota='Manado',view='sum';
 async function load(){
-  const [sm,stk,po]=await Promise.all([get('so_meta'),get('stok_terkini'),get('po_aktif')]);
+  const [sm,stk,po]=await Promise.all([get('so_meta'),get('stok_terkini'),get('po_terkini')]);
   const metaSo=JSON.parse(field(sm,'months')||'{}'),months=Object.keys(metaSo).sort().slice(-3);
   if(!months.length)throw new Error('Belum ada data selling out. Import dulu lewat halaman import.');
   const so=await Promise.all(months.map(m=>get('so_'+m)));
@@ -148,12 +181,16 @@ async function load(){
     o.s[k]=(o.s[k]||0)+q;
   });
   // PO aktif = barang dalam perjalanan (in transit), qty dalam pcs
-  if(po)JSON.parse(field(po,'data')).forEach(([cab,kode,name,q])=>{
-    const k=kotaOf(cab);if(!k)return;const o=byCode.get(kode)||slot(kode,name);if(!o)return;
+  const poRows=[];
+  if(po)JSON.parse(field(po,'data')).forEach(([cab,kode,name,q,v,no,d,ex,stt])=>{
+    const k=kotaOf(cab);if(!k)return;const st=stt||'ACTIVE';
+    poRows.push({kota:k,cab,kode,item:name,q,v,no,d,ex,st});
+    if(st!=='ACTIVE')return;   // in transit = hanya PO aktif
+    const o=byCode.get(kode)||slot(kode,name);if(!o)return;
     o.it[k]=(o.it[k]||0)+q;
   });
   D={months,items:[...items.values()],stokDate:stk?field(stk,'tanggal'):null,
-     lastSo:Object.values(metaSo).map(x=>x.at).sort().pop(),lastSt:stk?field(stk,'at'):null,poDate:po?field(po,'tanggal'):null,lastPo:po?field(po,'at'):null};
+     lastSo:Object.values(metaSo).map(x=>x.at).sort().pop(),lastSt:stk?field(stk,'at'):null,poDate:po?field(po,'tanggal'):null,lastPo:po?field(po,'at'):null,poRows};
 }
 function rowsOf(k){
   const n=D.months.length;
@@ -162,7 +199,7 @@ function rowsOf(k){
     return{kode:o.kode,n:o.n,t:o.t,u,q:d.slice(0,3).map(v=>v/div),avg,ar:(d[3]+d[4]+d[5])/n,stock,doi:doi(stock,avg),transit,doiT:doi(stock+transit,avg),po:poOf(avg,stock+transit),st:status(stock,avg)};
   }).filter(r=>r.st).sort((a,b)=>grp(a.n)-grp(b.n)||b.ar-a.ar||b.stock-a.stock);
 }
-function render(){
+function renderSum(){
   if(!D)return;
   const r=rowsOf(kota),c=r.filter(x=>x.u==='CTN'),h=r.filter(x=>x.u==='PCS');
   const sum=(a,f)=>a.reduce((s,x)=>s+x[f],0);
@@ -191,7 +228,38 @@ function render(){
   }));
   $('foot').textContent='Terakhir upload: selling out '+(D.lastSo?wita(D.lastSo):'-')+' · stok '+(D.lastSt?wita(D.lastSt):'-')+(D.lastPo?' · PO aktif (per '+dlbl(D.poDate)+') '+wita(D.lastPo):'')+'. Sumber: laporan Selling Out PD, Stock Baik, dan Purchase Order (Indogrosir dan SPI). Satuan CTN. NutriSari: 1 CTN = 720 pcs untuk American Sweet Orange, Florida Orange, dan Jeruk Peras, selain itu 160 pcs. HILO per CTN: SCT Chocolate 150, SCT Swiss 120, RCG School 12, Choco Malt 8, Hazelnut 12, Teh Tarik 8, Swiss 12, Taro 15, Avocado 15 pcs. Avg dibagi jumlah bulan, termasuk bulan tanpa penjualan. Cabang SPI bertambah sepanjang 2026, jadi bulan awal tidak sepenuhnya setara.';
 }
+const dshort=d=>d?+d.slice(8)+' '+BLN[+d.slice(5,7)]+' '+d.slice(2,4):'-';
+function renderPO(){
+  const stt=view,label=stt==='EXPIRED'?'expired':'received';
+  const all=D.poRows.filter(x=>x.kota===kota&&x.st===stt);
+  const qs=$('q2').value.trim().toLowerCase();
+  const rr=(qs?all.filter(x=>(x.item+' '+x.kode+' '+x.no).toLowerCase().includes(qs)):all).slice().sort((a,b)=>b.d.localeCompare(a.d)||a.no.localeCompare(b.no)||a.item.localeCompare(b.item));
+  $('sub').textContent='PO '+label+' · '+kota+' · semua item PO, termasuk di luar RCG dan SCT'+(D.poDate?' · data per '+dlbl(D.poDate):'');
+  $('ptake').replaceChildren(el('b',null,kota),document.createTextNode(' punya '+new Set(all.map(x=>x.no)).size+' PO '+label+' ('+all.length+' baris item).'));
+  $('pn').textContent=nf.format(new Set(all.map(x=>x.no)).size);$('pr').textContent=nf.format(all.length);
+  $('pq').textContent=nf.format(all.reduce((s,x)=>s+x.q,0));$('pv').textContent='Rp '+cf.format(all.reduce((s,x)=>s+x.v,0));
+  $('ph').textContent='PO '+(stt==='EXPIRED'?'Expired':'Received');
+  $('pnote').textContent=stt==='EXPIRED'?'PO yang melewati tanggal expired sebelum barang diterima. Diurutkan dari tanggal PO terbaru.':'PO yang barangnya sudah diterima. Diurutkan dari tanggal PO terbaru.';
+  $('qn2').textContent=qs?rr.length+' dari '+all.length+' baris cocok dengan "'+$('q2').value.trim()+'"':'';
+  $('prows').replaceChildren(...rr.map(x=>{
+    const tr=el('tr'),isc=/\b(RCG|SCT)\b/.test(x.item),un=isc?unitOf(x.item):null;
+    const it=el('td',null,x.item);it.append(el('small',null,x.kode));
+    tr.append(el('td',null,dshort(x.d)),el('td',null,x.no),el('td',null,x.cab),it,el('td',null,nf.format(x.q)),
+      el('td',null,un&&un.u==='CTN'?n1.format(x.q/un.div):'-'),el('td',null,'Rp '+nf.format(x.v)),el('td',null,dshort(x.ex)));
+    return tr;
+  }));
+}
+function render(){
+  if(!D)return;
+  const sum=view==='sum';$('v-sum').hidden=!sum;$('v-po').hidden=sum;
+  if(sum)renderSum();else renderPO();
+}
 $('q').addEventListener('input',render);
+$('q2').addEventListener('input',render);
+$('tabs').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;view=b.dataset.v;
+  document.querySelectorAll('#tabs button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));render();
+});
 // ---- Export Excel: satu sheet per kota, isi dan warna sama dengan Item summary, kolom Kode di depan ----
 const XL_URL='https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
 let xlP=null;
