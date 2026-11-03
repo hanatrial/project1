@@ -204,7 +204,7 @@ async function load(){
 function rowsOf(k){
   const n=D.months.length;
   return D.items.map(o=>{
-    const {u,div}=unitOf(o.n),d=o.d[k]||[0,0,0,0,0,0],avg=(d[0]+d[1]+d[2])/n/div,stock=(o.s[k]||0)/div,transit=(o.it[k]||0)/div;
+    const {u,div}=unitOf(o.n),d=o.d[k]||[0,0,0,0,0,0],avg=(d[0]+d[1]+d[2])/n/div,stock=Math.max(0,o.s[k]||0)/div,transit=(o.it[k]||0)/div;
     return{kode:o.kode,n:o.n,t:o.t,u,q:d.slice(0,3).map(v=>v/div),avg,ar:(d[3]+d[4]+d[5])/n,stock,doi:doi(stock,avg),transit,doiT:doi(stock+transit,avg),po:poOf(avg,stock+transit),st:status(stock,avg)};
   }).filter(r=>r.st).sort((a,b)=>grp(a.n)-grp(b.n)||b.ar-a.ar||b.stock-a.stock);
 }
