@@ -5,19 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Selling Out dan DOI</title>
 <style>
-  :root{--bg:#f5f6f3;--card:#fff;--fg:#17201c;--mut:#66736c;--line:#dfe4de;--acc:#0b6b5e;
+  :root{--bg:#eef1f5;--card:#fff;--fg:#1d2733;--mut:#6a7787;--line:#dde3ea;--acc:#0b6fd1;--red:#c8262d;--nav:#2c3e50;--th:#3f6fe0;
     --low:#c63a47;--warn:#b5771a;--ok:#137a5a;--high:#2f6fb5;--idle:#7a857f}
-  @media (prefers-color-scheme:dark){:root{--bg:#101512;--card:#18201c;--fg:#e8eee9;--mut:#93a39a;--line:#2a352f;--acc:#3fb59f;
+  @media (prefers-color-scheme:dark){:root{--bg:#0e141b;--card:#17202b;--fg:#e6ebf1;--mut:#93a0af;--line:#273341;--acc:#4da3ff;--red:#e0555c;--nav:#0b1219;--th:#2a56c8;
     --low:#ef7a85;--warn:#e0a24a;--ok:#4cc79b;--high:#6fa8e8;--idle:#98a49d}}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
-  main{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
-  h1{margin:0;font-size:1.5rem;line-height:1.15}
+  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif}
+  .wrap{max-width:1120px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+  main{display:flex;flex-direction:column;gap:16px;padding-block:20px 40px}
+  h1{margin:0;font-size:2rem;font-weight:300;letter-spacing:-.01em;line-height:1.15}
   h2{margin:0;font-size:1rem}
   .sub,.note,.foot{color:var(--mut);font-size:.82rem;margin:4px 0 0}
   .seg{display:flex;flex-wrap:wrap;gap:8px}
-  .seg button{font:inherit;min-height:42px;padding:8px 16px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
-  .seg button[aria-pressed=true]{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc);font-weight:600}
+  .seg button{font:inherit;min-height:42px;padding:8px 18px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
+  .seg button[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
   button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
   .take{margin:0}
   .col{display:flex;flex-direction:column;gap:16px}
@@ -26,8 +27,9 @@
   .t2 td:nth-child(3){text-align:left;white-space:normal;min-width:9rem}
   .t2 td:nth-child(4){text-align:left;white-space:normal;min-width:14rem}
   .t2 td:nth-child(2){text-align:left}
+  .t2 th:nth-child(-n+4){text-align:left}
   .t2 td small{display:block;color:var(--mut);font-size:.72rem}
-  .xbtn{font:inherit;font-weight:600;min-height:42px;margin-top:12px;padding:8px 16px;border-radius:10px;border:1px solid var(--acc);background:transparent;color:var(--acc);cursor:pointer}
+  .xbtn{font:inherit;font-weight:600;min-height:42px;margin-top:12px;padding:8px 18px;border-radius:8px;border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer}
   .xbtn:disabled{opacity:.5;cursor:default}
   .xbtn:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
   .srch{font:inherit;width:100%;min-height:42px;margin-top:12px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);-webkit-appearance:none}
@@ -39,51 +41,62 @@
   td.po-c{font-weight:700;color:var(--fg)}
   td.po-c.z{font-weight:400;color:var(--mut)}
   #sh th{cursor:pointer;user-select:none}
-  #sh th:hover{color:var(--fg)}
+  #sh th:hover{background:color-mix(in srgb,var(--th) 85%,#000)}
   #sh th:focus-visible{outline:2px solid var(--acc);outline-offset:-2px}
   #sh th[aria-sort=ascending]::after{content:' ▲';font-size:.7em}
   #sh th[aria-sort=descending]::after{content:' ▼';font-size:.7em}
-  #sh th[aria-sort]{color:var(--fg)}
+  #sh th[aria-sort]{background:color-mix(in srgb,var(--th) 80%,#000)}
   td.tr-c small{display:block;color:var(--mut);font-size:.72rem}
   td.tr-c.z{color:var(--mut)}
   .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,13rem),1fr));gap:12px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0;box-shadow:0 1px 3px rgba(20,35,60,.08)}
+  .tile{border-top:3px solid var(--acc)}
+  .tiles .tile:nth-child(2){border-top-color:var(--red)}
+  .tile[class*=s-]{border-top-color:var(--c)}
   .tile .big{display:block;font-size:1.9rem;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;margin-top:4px}
   .tile .sm{display:block;color:var(--mut);font-size:.78rem;margin-top:2px}
-  .lbl{color:var(--mut);font-size:.8rem}
+  .lbl{color:var(--mut);font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
   .s-low{--c:var(--low)} .s-warn{--c:var(--warn)} .s-ok{--c:var(--ok)} .s-high{--c:var(--high)} .s-idle{--c:var(--idle)}
   .tile[class*=s-] .big{color:var(--c)}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
   .chip{display:inline-flex;gap:6px;align-items:center;padding:3px 10px;border-radius:999px;font-size:.78rem;color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent);border:1px solid color-mix(in srgb,var(--c) 40%,transparent)}
   .chip b{font-variant-numeric:tabular-nums}
-  .scroll{overflow:auto;max-height:36rem;margin-top:12px}
+  .scroll{overflow:auto;max-height:36rem;margin-top:12px;border:1px solid var(--line);border-radius:8px}
   table{width:100%;border-collapse:collapse;font-size:.82rem;font-variant-numeric:tabular-nums}
   th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
   th:first-child,td:first-child{text-align:left;white-space:normal;min-width:13rem}
-  th{position:sticky;top:0;background:var(--card);color:var(--mut);font-weight:600}
+  th{position:sticky;top:0;background:var(--th);color:#fff;font-weight:600;border-bottom:0}
+  tbody tr:hover td:not(.c){background:color-mix(in srgb,var(--acc) 7%,transparent)}
   td.t{text-align:center}
   td.c{color:var(--c);background:color-mix(in srgb,var(--c) 11%,transparent);font-weight:600}
   td.c small{display:block;font-weight:400;color:var(--mut);font-size:.72rem}
   .pill{display:inline-block;padding:1px 8px;border:1px solid var(--line);border-radius:999px;font-size:.7rem}
   .err{color:var(--low)}
+  .tabs button{border-radius:8px;padding:8px 20px}
+  .tabs button[aria-pressed=true]{background:var(--card);color:var(--acc);border-color:var(--acc);box-shadow:inset 0 -3px 0 var(--red)}
+  .band{display:flex;flex-direction:column}
+  .band i{display:block;height:14px}
+  .band i:first-child{background:#0b6fd1}
+  .band i:last-child{background:var(--red)}
 </style>
 </head>
 <body>
-<main>
+<div class="band"><i></i><i></i></div>
+<main class="wrap">
   <header>
     <h1>Selling Out dan DOI</h1>
     <p class="sub" id="sub">Memuat data…</p>
   </header>
-  <div class="seg" id="tabs" role="group" aria-label="Pilih tampilan">
-    <button type="button" data-v="sum" aria-pressed="true">Summary</button>
-    <button type="button" data-v="EXPIRED" aria-pressed="false">PO Expired</button>
-    <button type="button" data-v="RECEIVED" aria-pressed="false">PO Received</button>
-  </div>
   <div class="seg" id="seg" role="group" aria-label="Pilih kota">
     <button type="button" data-k="Manado" aria-pressed="true">Manado</button>
     <button type="button" data-k="Makassar" aria-pressed="false">Makassar</button>
     <button type="button" data-k="Kendari" aria-pressed="false">Kendari</button>
     <button type="button" data-k="Gorontalo" aria-pressed="false">Gorontalo</button>
+  </div>
+  <div class="seg tabs" id="tabs" role="group" aria-label="Pilih tampilan">
+    <button type="button" data-v="sum" aria-pressed="true">Summary</button>
+    <button type="button" data-v="EXPIRED" aria-pressed="false">PO Expired</button>
+    <button type="button" data-v="RECEIVED" aria-pressed="false">PO Received</button>
   </div>
   <div id="v-sum" class="col">
   <div class="po">

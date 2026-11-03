@@ -6,18 +6,18 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Import Data Penjualan</title>
 <style>
-  :root{--bg:#f5f6f3;--card:#fff;--fg:#17201c;--mut:#66736c;--line:#dfe4de;--acc:#0b6b5e;--ok:#137a5a;--warn:#b5771a;--bad:#c63a47}
-  @media (prefers-color-scheme:dark){:root{--bg:#101512;--card:#18201c;--fg:#e8eee9;--mut:#93a39a;--line:#2a352f;--acc:#3fb59f;--ok:#4cc79b;--warn:#e0a24a;--bad:#ef7a85}}
+  :root{--bg:#eef1f5;--card:#fff;--fg:#1d2733;--mut:#6a7787;--line:#dde3ea;--acc:#0b6fd1;--red:#c8262d;--nav:#2c3e50;--th:#3f6fe0;--ok:#137a5a;--warn:#b5771a;--bad:#c63a47}
+  @media (prefers-color-scheme:dark){:root{--bg:#0e141b;--card:#17202b;--fg:#e6ebf1;--mut:#93a0af;--line:#273341;--acc:#4da3ff;--red:#e0555c;--nav:#0b1219;--th:#2a56c8;--ok:#4cc79b;--warn:#e0a24a;--bad:#ef7a85}}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
-  main{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
-  h1{margin:0;font-size:1.5rem;line-height:1.15}
+  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif}
+  main{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:14px;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+  h1{margin:0;font-size:2rem;font-weight:300;letter-spacing:-.01em;line-height:1.15}
   .sub,.note{color:var(--mut);font-size:.85rem;margin:4px 0 0}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0;box-shadow:0 1px 3px rgba(20,35,60,.08);border-top:3px solid var(--acc)}
   label.pick{display:block;border:2px dashed var(--line);border-radius:12px;padding:22px 12px;text-align:center;cursor:pointer;color:var(--mut)}
   label.pick:hover,label.pick:focus-within{border-color:var(--acc)}
   input[type=file]{position:absolute;opacity:0;width:1px;height:1px}
-  .btn{font:inherit;font-weight:600;width:100%;min-height:46px;border:0;border-radius:12px;background:var(--acc);color:#fff;cursor:pointer}
+  .btn{font:inherit;font-weight:600;width:100%;min-height:46px;border:0;border-radius:8px;background:var(--acc);color:#fff;cursor:pointer}
   .btn:disabled{opacity:.5;cursor:default}
   .btn:focus-visible,label.pick:focus-within{outline:2px solid var(--acc);outline-offset:2px}
   ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
@@ -30,9 +30,15 @@
   .cur{font-size:.85rem;color:var(--mut)}
   .cur b{color:var(--fg)}
   [hidden]{display:none!important}
+  .band{display:flex;flex-direction:column}
+  .band i{display:block;height:14px}
+  .band i:first-child{background:#0b6fd1}
+  .band i:last-child{background:var(--red)}
+
 </style>
 </head>
 <body>
+<div class="band"><i></i><i></i></div>
 <main>
   <header>
     <h1>Import Data Penjualan</h1>
