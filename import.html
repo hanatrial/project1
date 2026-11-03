@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Import Data Penjualan</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b6fd1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1219" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
   :root{--bg:#eef1f5;--card:#fff;--fg:#1d2733;--mut:#6a7787;--line:#dde3ea;--acc:#0b6fd1;--red:#c8262d;--nav:#2c3e50;--th:#3f6fe0;--ok:#137a5a;--warn:#b5771a;--bad:#c63a47}
   @media (prefers-color-scheme:dark){:root{--bg:#0e141b;--card:#17202b;--fg:#e6ebf1;--mut:#93a0af;--line:#273341;--acc:#4da3ff;--red:#e0555c;--nav:#0b1219;--th:#2a56c8;--ok:#4cc79b;--warn:#e0a24a;--bad:#ef7a85}}
@@ -244,6 +249,7 @@ $('go').addEventListener('click',async()=>{
     render();$('pnote').textContent='Selesai. Tersimpan: '+out.join(', ')+'.';
   }catch(x){$('pnote').textContent='Gagal: '+x.message+(out.length?' (sudah tersimpan: '+out.join(', ')+')':'');$('go').disabled=false}
 });
+if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 loadMeta().catch(x=>{$('cur').textContent='Tidak bisa membaca database: '+x.message});
 </script>
 </body>
