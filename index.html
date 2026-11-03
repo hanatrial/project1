@@ -297,7 +297,7 @@ async function load(){
   // PO aktif = barang dalam perjalanan (in transit), qty dalam pcs
   const poRows=[];
   if(po)JSON.parse(field(po,'data')).forEach(([cab,kode,name,q,v,no,d,ex,stt])=>{
-    const k=kotaOf(cab);if(!k||!/\b(RCG|SCT)\b/.test(name))return;const st=stt||'ACTIVE';
+    const k=kotaOf(cab);if(!k)return;const st=stt||'ACTIVE';
     poRows.push({kota:k,cab,kode,item:name,q,v,no,d,ex,st});
     if(st!=='ACTIVE')return;   // in transit = hanya PO aktif
     const o=byCode.get(kode)||slot(kode,name);if(!o)return;
@@ -352,7 +352,7 @@ function renderPO(){
   const all=D.poRows.filter(x=>x.kota===kota&&x.st===stt);
   const qs=$('q2').value.trim().toLowerCase();
   const rr=(qs?all.filter(x=>(x.item+' '+x.kode+' '+x.no).toLowerCase().includes(qs)):all).slice().sort((a,b)=>b.d.localeCompare(a.d)||a.no.localeCompare(b.no)||a.item.localeCompare(b.item));
-  $('sub').textContent='PO '+label+' · '+kota+' · item RCG dan SCT'+(D.poDate?' · data per '+dlbl(D.poDate):'');
+  $('sub').textContent='PO '+label+' · '+kota+' · semua item PO, termasuk di luar RCG dan SCT'+(D.poDate?' · data per '+dlbl(D.poDate):'');
   $('ptake').replaceChildren(el('b',null,kota),document.createTextNode(' punya '+new Set(all.map(x=>x.no)).size+' PO '+label+' ('+all.length+' baris item).'));
   $('pn').textContent=nf.format(new Set(all.map(x=>x.no)).size);$('pr').textContent=nf.format(all.length);
   $('pq').textContent=nf.format(all.reduce((s,x)=>s+x.q,0));$('pv').textContent='Rp '+cf.format(all.reduce((s,x)=>s+x.v,0));
