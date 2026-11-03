@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Import Data Penjualan</title>
+<style>
+  :root{--bg:#f5f6f3;--card:#fff;--fg:#17201c;--mut:#66736c;--line:#dfe4de;--acc:#0b6b5e;--ok:#137a5a;--warn:#b5771a;--bad:#c63a47}
+  @media (prefers-color-scheme:dark){:root{--bg:#101512;--card:#18201c;--fg:#e8eee9;--mut:#93a39a;--line:#2a352f;--acc:#3fb59f;--ok:#4cc79b;--warn:#e0a24a;--bad:#ef7a85}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+  main{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+  h1{margin:0;font-size:1.5rem;line-height:1.15}
+  .sub,.note{color:var(--mut);font-size:.85rem;margin:4px 0 0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+  label.pick{display:block;border:2px dashed var(--line);border-radius:12px;padding:22px 12px;text-align:center;cursor:pointer;color:var(--mut)}
+  label.pick:hover,label.pick:focus-within{border-color:var(--acc)}
+  input[type=file]{position:absolute;opacity:0;width:1px;height:1px}
+  .btn{font:inherit;font-weight:600;width:100%;min-height:46px;border:0;border-radius:12px;background:var(--acc);color:#fff;cursor:pointer}
+  .btn:disabled{opacity:.5;cursor:default}
+  .btn:focus-visible,label.pick:focus-within{outline:2px solid var(--acc);outline-offset:2px}
+  ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+  li{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:10px 0;border-top:1px solid var(--line)}
+  li:first-child{border-top:0}
+  li input{grid-row:span 2;margin-top:3px;width:18px;height:18px}
+  .nm{font-weight:600;overflow-wrap:anywhere}
+  .st{font-size:.82rem;color:var(--mut)}
+  .st.ok{color:var(--ok)} .st.warn{color:var(--warn)} .st.bad{color:var(--bad)}
+  .cur{font-size:.85rem;color:var(--mut)}
+  .cur b{color:var(--fg)}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Import Data Penjualan</h1>
+    <p class="sub">Pilih file SellingOutPD atau StockBaik (.xlsx), satu atau banyak sekaligus, jenisnya dikenali otomatis. Hanya cabang Manado, Makassar, Kendari, dan Gorontalo yang disimpan ke database.</p>
+  </header>
+
+  <div class="card">
+    <label class="pick" for="f">Ketuk untuk memilih file .xlsx</label>
+    <input type="file" id="f" accept=".xlsx" multiple>
+  </div>
+
+  <div class="card" id="prev" hidden>
+    <ul id="list"></ul>
+    <p class="note" id="pnote"></p>
+    <button class="btn" id="go" type="button">Simpan ke database</button>
+  </div>
+
+  <p class="cur" id="cur">Memuat isi database…</p>
+</main>
+<script>
+const P='mds-sulawesi',K='AIzaSyCA8Q8athqYIsY3By5wPxcU97GjDBR6DAs';
+const DB='https://firestore.googleapis.com/v1/projects/'+P+'/databases/(default)/documents/pjmds_data';
+const XLSX_URL='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+const MON={JANUARY:1,FEBRUARY:2,MARCH:3,APRIL:4,MAY:5,JUNE:6,JULY:7,AUGUST:8,SEPTEMBER:9,OCTOBER:10,NOVEMBER:11,DECEMBER:12};
+const BLN=['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+const KOTA=[[/GORONTALO/,'Gorontalo'],[/MAKASS?AR/,'Makassar'],[/MANADO/,'Manado'],[/KENDARI/,'Kendari']];
+const kotaOf=c=>{c=c.toUpperCase();for(const [re,k] of KOTA)if(re.test(c))return k;return null};
+const $=id=>document.getElementById(id);
+const nf=new Intl.NumberFormat('id-ID',{maximumFractionDigits:0});
+const lbl=m=>BLN[+m.slice(5)]+' '+m.slice(0,4);
+const EN={JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};
+let meta={months:{},snaps:{}},queue=[],xlsxP=null;
+
+async function get(p){const r=await fetch(DB+'/'+p+'?key='+K);if(r.status===404)return null;if(!r.ok)throw new Error('Baca '+p+' gagal ('+r.status+')');return r.json()}
+async function patch(p,fields){const r=await fetch(DB+'/'+p+'?key='+K,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields})});if(!r.ok)throw new Error('Simpan '+p+' gagal ('+r.status+(r.status===429?', kuota harian habis':'')+')')}
+const sv=s=>({stringValue:String(s)});
+
+const wita=iso=>iso?new Date(iso).toLocaleString('id-ID',{timeZone:'Asia/Makassar',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}).replace(/\./g,':')+' WITA':'-';
+const dlbl=d=>+d.slice(8)+' '+BLN[+d.slice(5,7)]+' '+d.slice(0,4);
+const latest=o=>Object.values(o).map(x=>x.at).sort().pop();
+async function loadMeta(){
+  const [a,b]=await Promise.all([get('so_meta'),get('stok_meta')]);
+  meta={months:a&&a.fields&&a.fields.months?JSON.parse(a.fields.months.stringValue):{},snaps:b&&b.fields&&b.fields.snaps?JSON.parse(b.fields.snaps.stringValue):{}};
+  const mk=Object.keys(meta.months).sort(),sk=Object.keys(meta.snaps).sort(),box=$('cur');box.replaceChildren();
+  const line=(t,v,at)=>{const p=document.createElement('p');p.style.margin='0 0 6px';p.append(t+' ',Object.assign(document.createElement('b'),{textContent:v}),at?' · upload terakhir '+wita(at):'');box.append(p)};
+  if(!mk.length&&!sk.length){box.textContent='Database masih kosong.';return}
+  if(mk.length)line('Selling out:',lbl(mk[0])+' sampai '+lbl(mk[mk.length-1])+' ('+mk.length+' bulan)',latest(meta.months));
+  if(sk.length)line('Stok:','update '+dlbl(sk[sk.length-1])+' ('+sk.length+' tanggal)',latest(meta.snaps));
+}
+function xlsx(){
+  if(window.XLSX)return Promise.resolve();
+  return xlsxP||(xlsxP=new Promise((ok,no)=>{const s=document.createElement('script');s.src=XLSX_URL;s.onload=ok;s.onerror=()=>{xlsxP=null;no(new Error('Pustaka pembaca Excel gagal dimuat, cek internet'))};document.head.append(s)}));
+}
+const num=v=>{v=Number(v);return isFinite(v)?v:0};
+
+function parse(buf){
+  const wb=XLSX.read(buf,{type:'array'});
+  const a=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:null,raw:true});
+  if(/^\s*STOCK PER/i.test(String((a[2]&&a[2][0])||'')))return parseStock(a);
+  const t=String((a[1]&&a[1][0])||''),m=t.match(/1 TO (\d+) (\w+) (\d{4})/);
+  if(!m||!MON[m[2].toUpperCase()])throw new Error('Judul periode tidak terbaca di baris 2');
+  const month=m[3]+'-'+String(MON[m[2].toUpperCase()]).padStart(2,'0');
+  const head=a[4]||[],sub=a[5]||[];
+  if(!head.length||sub[3]!=='QTY'&&!sub.includes('QTY'))throw new Error('Format kolom cabang tidak dikenali');
+  const starts=head.map((v,i)=>v?i:-1).filter(i=>i>=0),cols=[];
+  head.forEach((v,i)=>{
+    if(!v||String(v).trim()==='TOTAL')return;
+    const cab=String(v).trim();if(!kotaOf(cab))return;
+    const end=starts.find(s=>s>i);const to=end==null?head.length:end;
+    let q=-1,r=-1;for(let j=i;j<to;j++){if(sub[j]==='QTY'&&q<0)q=j;if(sub[j]==='RPH'&&r<0)r=j}
+    if(q>=0&&r>=0)cols.push({cab,q,r});
+  });
+  if(!cols.length)throw new Error('Tidak ada cabang Manado, Makassar, Kendari, atau Gorontalo');
+  const rows=[];
+  for(let i=6;i<a.length;i++){
+    const row=a[i];if(!row||!row[0]||!row[1])continue;
+    const name=String(row[1]).trim(),mm=name.match(/^(.*)-(\d+)$/);
+    cols.forEach(c=>rows.push([c.cab,mm?mm[2]:'',mm?mm[1].trim():name,num(row[c.q]),num(row[c.r])]));
+  }
+  return{type:'so',key:month,month,rows,cabang:cols.length,items:new Set(rows.map(r=>r[1]+r[2])).size,qty:rows.reduce((s,r)=>s+r[3],0)};
+}
+
+function parseStock(a){
+  const t=String((a[2]&&a[2][0])||''),m=t.match(/\(\s*(\d{1,2})-(\w{3})-(\d{4})\s*\)/);
+  if(!m||!EN[m[2].toUpperCase()])throw new Error('Tanggal stok tidak terbaca di baris 3');
+  const date=m[3]+'-'+String(EN[m[2].toUpperCase()]).padStart(2,'0')+'-'+m[1].padStart(2,'0');
+  const h=a[4]||[],ci=h.indexOf('BRANCH'),qi=h.indexOf('QTY');
+  if(ci<0||qi<0)throw new Error('Kolom BRANCH atau QTY tidak ditemukan');
+  const rows=[];let cur=null;
+  for(let i=5;i<a.length;i++){
+    const r=a[i];if(!r)continue;if(r[0])cur=String(r[0]).trim();
+    const cab=r[ci]&&String(r[ci]).trim();if(!cab||cab==='TOTAL'||!kotaOf(cab)||!cur)continue;
+    const mm=cur.match(/^(.*)\s-\s*(\d+)$/)||cur.match(/^(.*)-(\d+)$/);
+    rows.push([cab,mm?mm[2]:'',mm?mm[1].trim():cur,num(r[qi])]);
+  }
+  if(!rows.length)throw new Error('Tidak ada cabang Manado, Makassar, Kendari, atau Gorontalo');
+  return{type:'stok',key:date,rows,cabang:new Set(rows.map(r=>r[0])).size,items:new Set(rows.map(r=>r[1]+r[2])).size,qty:rows.reduce((s,r)=>s+r[3],0)};
+}
+
+$('f').addEventListener('change',async e=>{
+  const files=[...e.target.files];if(!files.length)return;
+  $('prev').hidden=false;$('list').replaceChildren();$('go').disabled=true;$('pnote').textContent='Membaca file…';
+  queue=[];
+  try{await xlsx()}catch(x){$('pnote').textContent=x.message;return}
+  const byMonth=new Map(),METAOF=t=>t==='so'?meta.months:meta.snaps;
+  for(const f of files){
+    try{const p=parse(await f.arrayBuffer());p.file=f.name;
+      const id=p.type+p.key,prev=byMonth.get(id);
+      if(prev&&prev.qty>=p.qty){prev.dup=(prev.dup||0)+1;continue}   // file periode sama: pakai yang terbesar
+      byMonth.set(id,p);
+    }catch(x){queue.push({file:f.name,error:x.message})}
+  }
+  const ok=[...byMonth.values()].sort((a,b)=>a.type+a.key<b.type+b.key?-1:1);
+  for(const p of ok){
+    const cur=METAOF(p.type)[p.key];
+    p.json=JSON.stringify(p.rows);
+    if(cur&&cur.q===p.qty&&cur.n===p.rows.length){p.status='same'}
+    else if(cur&&p.type==='so'&&p.qty<cur.q*.5){p.status='small'}
+    else p.status=cur?'replace':'new';
+    queue.push(p);
+  }
+  render();
+});
+
+function render(){
+  const ul=$('list');ul.replaceChildren();
+  queue.forEach((p,i)=>{
+    const li=document.createElement('li'),cb=document.createElement('input');cb.type='checkbox';cb.id='c'+i;
+    const nm=document.createElement('label'),st=document.createElement('span');nm.className='nm';st.className='st';nm.htmlFor=cb.id;
+    if(p.error){cb.disabled=true;nm.textContent=p.file;st.className='st bad';st.textContent='Dilewati: '+p.error}
+    else{
+      nm.textContent=(p.type==='so'?'Selling out '+lbl(p.key):'Stok '+dlbl(p.key))+' · '+p.file;
+      const base=p.cabang+' cabang · '+p.items+' item · QTY '+nf.format(p.qty)+(p.dup?' · '+p.dup+' file lain di bulan ini dilewati':'');
+      const cur=(p.type==='so'?meta.months:meta.snaps)[p.key];
+      if(p.status==='same'){cb.disabled=true;st.className='st';st.textContent='Sudah ada dan sama, tidak perlu disimpan. '+base}
+      else if(p.status==='small'){st.className='st warn';st.textContent='Lebih kecil dari yang tersimpan (QTY '+nf.format(cur.q)+'), kemungkinan file lama. Centang kalau mau tetap mengganti. '+base}
+      else if(p.status==='replace'){cb.checked=true;st.className='st warn';st.textContent='Mengganti data '+(p.type==='so'?'bulan':'tanggal')+' ini yang sudah ada (QTY '+nf.format(cur.q)+'). '+base}
+      else{cb.checked=true;st.className='st ok';st.textContent=(p.type==='so'?'Bulan baru. ':'Tanggal baru. ')+base}
+    }
+    cb.addEventListener('change',upd);li.append(cb,nm,st);ul.append(li);
+  });
+  upd();
+}
+function upd(){
+  const n=[...document.querySelectorAll('#list input:checked')].length;
+  $('go').disabled=!n;$('go').textContent=n?'Simpan '+n+' file ke database':'Tidak ada yang disimpan';
+  $('pnote').textContent=queue.some(p=>!p.error)?'':'Tidak ada file yang bisa dibaca.';
+}
+
+$('go').addEventListener('click',async()=>{
+  const picks=queue.filter((p,i)=>!p.error&&document.getElementById('c'+i).checked);
+  $('go').disabled=true;const out=[];
+  try{
+    for(const p of picks){
+      const so=p.type==='so',name=so?lbl(p.key):dlbl(p.key),now=new Date().toISOString();
+      $('pnote').textContent='Menyimpan '+name+'…';
+      if(p.json.length>900000)throw new Error(name+' terlalu besar untuk satu dokumen');
+      await patch((so?'so_':'stok_')+p.key,{[so?'bulan':'tanggal']:sv(p.key),data:sv(p.json),n:{integerValue:String(p.rows.length)},file:sv(p.file),at:sv(now)});
+      const mp=so?'so_meta':'stok_meta',fld=so?'months':'snaps',d=await get(mp);
+      const cur=d&&d.fields&&d.fields[fld]?JSON.parse(d.fields[fld].stringValue):{};
+      cur[p.key]={n:p.rows.length,q:p.qty,at:now,file:p.file};
+      await patch(mp,{[fld]:sv(JSON.stringify(cur)),updatedAt:sv(now)});
+      out.push((so?'selling out ':'stok ')+name);
+    }
+    await loadMeta();
+    queue.forEach(p=>{if(!p.error&&picks.includes(p))p.status='same'});
+    render();$('pnote').textContent='Selesai. Tersimpan: '+out.join(', ')+'.';
+  }catch(x){$('pnote').textContent='Gagal: '+x.message+(out.length?' (sudah tersimpan: '+out.join(', ')+')':'');$('go').disabled=false}
+});
+loadMeta().catch(x=>{$('cur').textContent='Tidak bisa membaca database: '+x.message});
+</script>
+</body>
+</html>

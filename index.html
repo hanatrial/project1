@@ -3,13 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Selling Out 3 Bulan</title>
+<title>Selling Out dan DOI</title>
 <style>
-  :root{--bg:#f5f6f3;--card:#fff;--fg:#17201c;--mut:#66736c;--line:#dfe4de;--acc:#0b6b5e}
-  @media (prefers-color-scheme:dark){:root{--bg:#101512;--card:#18201c;--fg:#e8eee9;--mut:#93a39a;--line:#2a352f;--acc:#3fb59f}}
+  :root{--bg:#f5f6f3;--card:#fff;--fg:#17201c;--mut:#66736c;--line:#dfe4de;--acc:#0b6b5e;
+    --low:#c63a47;--warn:#b5771a;--ok:#137a5a;--high:#2f6fb5;--idle:#7a857f}
+  @media (prefers-color-scheme:dark){:root{--bg:#101512;--card:#18201c;--fg:#e8eee9;--mut:#93a39a;--line:#2a352f;--acc:#3fb59f;
+    --low:#ef7a85;--warn:#e0a24a;--ok:#4cc79b;--high:#6fa8e8;--idle:#98a49d}}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
-  main{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+  main{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
   h1{margin:0;font-size:1.5rem;line-height:1.15}
   h2{margin:0;font-size:1rem}
   .sub,.note,.foot{color:var(--mut);font-size:.82rem;margin:4px 0 0}
@@ -21,27 +23,36 @@
   .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,13rem),1fr));gap:12px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
   .tile .big{display:block;font-size:1.9rem;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;margin-top:4px}
+  .tile .sm{display:block;color:var(--mut);font-size:.78rem;margin-top:2px}
   .lbl{color:var(--mut);font-size:.8rem}
+  .s-low{--c:var(--low)} .s-warn{--c:var(--warn)} .s-ok{--c:var(--ok)} .s-high{--c:var(--high)} .s-idle{--c:var(--idle)}
+  .tile[class*=s-] .big{color:var(--c)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chip{display:inline-flex;gap:6px;align-items:center;padding:3px 10px;border-radius:999px;font-size:.78rem;color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent);border:1px solid color-mix(in srgb,var(--c) 40%,transparent)}
+  .chip b{font-variant-numeric:tabular-nums}
   .bars{display:flex;flex-direction:column;gap:10px;margin-top:12px}
   .bn{font-size:.82rem;overflow-wrap:anywhere}
   .bt{display:flex;align-items:center;gap:8px}
   .bf{height:14px;border-radius:4px;background:var(--acc);min-width:2px}
   .bv{font-size:.8rem;color:var(--mut);font-variant-numeric:tabular-nums;white-space:nowrap}
-  .scroll{overflow:auto;max-height:34rem;margin-top:12px}
+  .scroll{overflow:auto;max-height:36rem;margin-top:12px}
   table{width:100%;border-collapse:collapse;font-size:.82rem;font-variant-numeric:tabular-nums}
   th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
   th:first-child,td:first-child{text-align:left;white-space:normal;min-width:13rem}
   th{position:sticky;top:0;background:var(--card);color:var(--mut);font-weight:600}
   td.t{text-align:center}
+  td.c{color:var(--c);background:color-mix(in srgb,var(--c) 11%,transparent);font-weight:600}
+  td.c small{display:block;font-weight:400;color:var(--mut);font-size:.72rem}
   .pill{display:inline-block;padding:1px 8px;border:1px solid var(--line);border-radius:999px;font-size:.7rem}
+  .err{color:var(--low)}
   @media(prefers-reduced-motion:no-preference){.bf{transition:width .25s}}
 </style>
 </head>
 <body>
 <main>
   <header>
-    <h1>Selling Out 3 Bulan</h1>
-    <p class="sub">Item RCG dan SCT · rata-rata Agustus, September, Oktober 2026 (3 bulan terakhir) · Indogrosir + SPI</p>
+    <h1>Selling Out dan DOI</h1>
+    <p class="sub" id="sub">Memuat data…</p>
   </header>
   <div class="seg" id="seg" role="group" aria-label="Pilih kota">
     <button type="button" data-k="Manado" aria-pressed="true">Manado</button>
@@ -51,60 +62,111 @@
   </div>
   <p class="take" id="take"></p>
   <div class="tiles">
-    <div class="card tile"><span class="lbl">Rata-rata QTY per bulan</span><span class="big" id="tq">-</span></div>
-    <div class="card tile"><span class="lbl">Rata-rata penjualan per bulan</span><span class="big" id="tr">-</span></div>
-    <div class="card tile"><span class="lbl">Item yang terjual</span><span class="big" id="tn">-</span></div>
+    <div class="card tile"><span class="lbl">Stock</span><span class="big" id="ts">-</span><span class="sm" id="tsd"></span></div>
+    <div class="card tile"><span class="lbl">Avg selling out per bulan</span><span class="big" id="ta">-</span><span class="sm" id="tad"></span></div>
+    <div class="card tile" id="tdc"><span class="lbl">DOI</span><span class="big" id="td">-</span><span class="sm">Stock ÷ Avg × 30 hari</span></div>
   </div>
+  <section class="card">
+    <h2>Item summary</h2>
+    <p class="note" id="legend"></p>
+    <div class="chips" id="chips"></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Item</th><th>Tipe</th><th>Stock</th><th>Avg / bln</th><th>DOI</th><th id="m1"></th><th id="m2"></th><th id="m3"></th><th>Avg Rp / bln</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+  </section>
   <section class="card">
     <h2>10 item terlaris</h2>
     <p class="note">Rata-rata QTY per bulan</p>
     <div class="bars" id="bars"></div>
   </section>
-  <section class="card">
-    <h2>Semua item</h2>
-    <p class="note">QTY per bulan dan rata-rata 3 bulan, dari yang terbanyak. Item tanpa penjualan tidak ditampilkan.</p>
-    <div class="scroll"><table>
-      <thead><tr><th>Item</th><th>Tipe</th><th id="m1"></th><th id="m2"></th><th id="m3"></th><th>Rata-rata QTY</th><th>Rata-rata Rp</th></tr></thead>
-      <tbody id="rows"></tbody>
-    </table></div>
-  </section>
-  <p class="foot">Sumber: laporan Selling Out PD (Indogrosir dan SPI). Rata-rata dibagi 3 bulan, termasuk bulan tanpa penjualan. Cabang SPI baru bertambah selama 2026 (SPI Makassar 2 sejak September), jadi bulan lebih awal tidak sepenuhnya setara.</p>
+  <p class="foot" id="foot"></p>
 </main>
 <script>
-const D={"b":["Agu","Sep","Okt"],"i":[{"n":"HILO MINUMAN BUBUK HI-CALCIUM CHOCO HAZELNUT RCG 10x14g","t":"RCG","d":{"Gorontalo":[105,112,54,1866847,1981261,971892],"Kendari":[32,28,24,597027,525676,452432],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,49,0,0,869369]}},{"n":"HILO MINUMAN BUBUK HI-CALCIUM CHOCO MALT RCG 10x14g","t":"RCG","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[76,70,44,1424144,1209009,841081],"Makassar":[82,78,59,1447748,1337838,1056126],"Manado":[100,103,60,1759099,1769820,1098378]}},{"n":"HILO MINUMAN BUBUK HI-CALCIUM TARO RCG 10x14g","t":"RCG","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,0,0,0,0,0],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,0,0,0,0]}},{"n":"HILO MINUMAN SERBUK TEH TARIK  RCG 10x15g","t":"RCG","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,0,0,0,0,0],"Makassar":[78,61,46,1328332,1045226,809528],"Manado":[0,0,0,0,0,0]}},{"n":"HILO SCHOOL SUSU BUBUK HI-CALCIUM CHOCOLATE RCG 10x30g","t":"RCG","d":{"Gorontalo":[203,138,263,6637838,4550270,8523603],"Kendari":[104,73,150,3389730,2407027,4859009],"Makassar":[97,79,141,3162703,2604865,4556757],"Manado":[115,148,145,3766486,4847027,4697117]}},{"n":"HILO SUSU BUBUK HI-CALCIUM AVOCADO CHOCO RCG 10x14g","t":"RCG","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,0,0,0,0,0],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,0,0,0,0]}},{"n":"HILO SUSU BUBUK HI-CALCIUM CHOCOLATE SCT 14g","t":"SCT","d":{"Gorontalo":[3040,910,910,5304307,1582252,1582252],"Kendari":[860,1000,710,1507928,1738739,1234504],"Makassar":[2160,1760,1120,3787721,3060180,1923063],"Manado":[2310,1270,1280,4046009,2208198,2225586]}},{"n":"HILO SUSU BUBUK HI-CALCIUM SWISS CHOCOLATE RCG 10x28 g","t":"RCG","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,20,64,0,346126,1102793],"Makassar":[0,20,46,0,376577,855315],"Manado":[0,16,65,0,288288,1167928]}},{"n":"HILO SUSU BUBUK HI-CALCIUM SWISS CHOCOLATE SCT 28g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[330,0,0,578644,0,0],"Makassar":[180,0,0,316216,0,0],"Manado":[870,0,0,1774414,0,0]}},{"n":"LOKALATE KOPI GULA AREN  RCG 10x15g","t":"RCG","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,0,0,0,0,0],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,0,0,0,0]}},{"n":"NUTRISARI INSTANT DRINK AMRCN SWT ORANG SCT 11/14g","t":"SCT","d":{"Gorontalo":[299000,310320,272170,340889238,359196231,326129828],"Kendari":[5470,3850,6190,6336712,4710361,7607342],"Makassar":[13370,12330,13000,15703154,15134797,15926577],"Manado":[467050,544330,395270,536962655,645361698,478146610]}},{"n":"NUTRISARI INSTANT DRINK ANGGUR HIJAU SCT 11g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[160,190,130,192432,236036,160360],"Makassar":[470,520,360,526608,592757,442793],"Manado":[390,340,440,447568,411081,547748]}},{"n":"NUTRISARI INSTANT DRINK ANGGUR SCT 11g","t":"SCT","d":{"Gorontalo":[2030,1790,1550,2306036,2248198,1954955],"Kendari":[1110,1100,1670,1312793,1341261,2057658],"Makassar":[2770,2280,2680,3135230,2790982,3394594],"Manado":[3100,3000,2630,3586126,3572432,3236937]}},{"n":"NUTRISARI INSTANT DRINK BELIMBING SCT 6g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,0,0,0,0,0],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,0,0,0,0]}},{"n":"NUTRISARI INSTANT DRINK BLEWAH SCT 11g","t":"SCT","d":{"Gorontalo":[250,290,180,288919,352252,226577],"Kendari":[80,180,190,96396,223423,237117],"Makassar":[410,590,450,459365,686482,565045],"Manado":[640,280,840,740541,324324,998198]}},{"n":"NUTRISARI INSTANT DRINK COCOPANDAN SCT 13g","t":"SCT","d":{"Gorontalo":[810,470,610,935946,592793,769369],"Kendari":[0,0,0,0,0,0],"Makassar":[1020,1200,1690,1144775,1364428,2086374],"Manado":[1130,1490,1100,1375946,1802190,1352432]}},{"n":"NUTRISARI INSTANT DRINK ES CINCAU SCT 13g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[240,540,360,285946,654414,439640],"Makassar":[240,250,260,268892,293793,307207],"Manado":[0,0,0,0,0,0]}},{"n":"NUTRISARI INSTANT DRINK ES KUWUD NIPIS SCT 11g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,0,0,0,0,0],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,0,0,0,0]}},{"n":"NUTRISARI INSTANT DRINK FLORIDA ORANGE SCT 12/14g","t":"SCT","d":{"Gorontalo":[810,840,2430,941892,977027,2947658],"Kendari":[1200,780,530,1408829,955856,646847],"Makassar":[650,1400,350,730712,1663955,440540],"Manado":[3430,2190,1980,3991171,2585495,2350360]}},{"n":"NUTRISARI INSTANT DRINK ISOTONIK SCT 11g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,0,0,0,0,0],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,0,0,0,0]}},{"n":"NUTRISARI INSTANT DRINK JEJU ORANGE SCT 14g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[360,710,1270,429369,870270,1562523],"Makassar":[890,750,730,1010198,934027,937387],"Manado":[190,280,300,220811,324685,347568]}},{"n":"NUTRISARI INSTANT DRINK JERUK EXTRA MNS SCT 11g","t":"SCT","d":{"Gorontalo":[6240,4240,7200,7090540,5201351,9032094],"Kendari":[530,790,1040,636396,961441,1274234],"Makassar":[2150,3110,2730,2558378,3782387,3464031],"Manado":[11400,9860,7530,13485226,11857838,9179707]}},{"n":"NUTRISARI INSTANT DRINK JERUK MANADO SCT 11g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,0,0,0,0,0],"Makassar":[0,0,0,0,0,0],"Manado":[1290,1180,1310,1468919,1387567,1621261]}},{"n":"NUTRISARI INSTANT DRINK JERUK MAROKO SCT 14g","t":"SCT","d":{"Gorontalo":[480,510,580,555676,637297,731531],"Kendari":[520,610,980,619820,736757,1209910],"Makassar":[720,610,640,806703,692369,743090],"Manado":[180,220,390,208649,254955,463784]}},{"n":"NUTRISARI INSTANT DRINK JERUK NIPIS SCT 11g","t":"SCT","d":{"Gorontalo":[2730,5010,6110,3119550,6275113,7658333],"Kendari":[2490,2500,4160,2934054,3023153,5106847],"Makassar":[6910,8520,7950,7767322,9979171,9763062],"Manado":[6890,8120,8140,7978828,9393874,9736847]}},{"n":"NUTRISARI INSTANT DRINK JERUK PERAS SCT 14g","t":"SCT","d":{"Gorontalo":[28950,29040,32590,33341127,33718559,39522928],"Kendari":[46270,50910,59760,53520857,60667569,72898424],"Makassar":[89120,124550,113190,101533181,148164660,137843064],"Manado":[13880,17280,14750,16073379,20597964,17891014]}},{"n":"NUTRISARI INSTANT DRINK KELAPA MUDA SCT 11g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,0,0,0,0,0],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,0,0,0,0]}},{"n":"NUTRISARI INSTANT DRINK LECI SCT 11g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,0,0,0,0,0],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,0,0,0,0]}},{"n":"NUTRISARI INSTANT DRINK LEMON TEA SCT 11g","t":"SCT","d":{"Gorontalo":[340,2090,1230,384685,2636036,1545270],"Kendari":[0,480,640,0,583784,800000],"Makassar":[3760,2780,2500,4221212,3439194,3150450],"Manado":[4020,5880,5210,4662883,6811171,6179639]}},{"n":"NUTRISARI INSTANT DRINK MADU JERUK SCT 14g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[560,340,270,666306,416216,333333],"Makassar":[440,1180,600,493923,1350856,767567],"Manado":[2590,1640,1470,2991622,1897658,1700090]}},{"n":"NUTRISARI INSTANT DRINK MADU KURMA SCT 14g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,0,0,0,0,0],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,0,0,0,0]}},{"n":"NUTRISARI INSTANT DRINK MADU LEMON SCT 14g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,0,0,0,0,0],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,0,0,0,0]}},{"n":"NUTRISARI INSTANT DRINK MANGGA GANDARIA SCT 14g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[740,1100,1270,882703,1336757,1567568],"Makassar":[860,970,520,963586,1106820,655946],"Manado":[1480,1260,1470,1711261,1456757,1756126]}},{"n":"NUTRISARI INSTANT DRINK MARKISA SCT 14g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[190,420,240,228468,517117,300541],"Makassar":[2550,1540,2600,2859937,1963495,3290991],"Manado":[980,970,870,1133964,1122613,1045586]}},{"n":"NUTRISARI INSTANT DRINK MELON SCT 11g","t":"SCT","d":{"Gorontalo":[470,380,440,532432,459414,589189],"Kendari":[0,0,0,0,0,0],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,0,0,0,0]}},{"n":"NUTRISARI INSTANT DRINK MILKY ORANGE SCT 11g","t":"SCT","d":{"Gorontalo":[1340,1060,1010,1553604,1360811,1319369],"Kendari":[290,540,860,337387,659459,1040946],"Makassar":[1100,1450,1640,1254865,1801505,2088288],"Manado":[1040,1390,1440,1205766,1609640,1757027]}},{"n":"NUTRISARI INSTANT DRINK MILKY PEACH SCT 11g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,0,0,0,0,0],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,0,0,0,0]}},{"n":"NUTRISARI INSTANT DRINK NANAS SCT 13g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,0,0,0,0,0],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,0,0,0,0]}},{"n":"NUTRISARI INSTANT DRINK SEMANGKA SCT 13g","t":"SCT","d":{"Gorontalo":[490,450,160,562973,520811,185946],"Kendari":[580,460,920,652162,557117,1114234],"Makassar":[320,520,1300,358532,596653,1555405],"Manado":[530,610,520,613423,706036,601441]}},{"n":"NUTRISARI INSTANT DRINK SIRSAK SCT 11g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[390,530,860,468649,641802,1059459],"Makassar":[740,580,920,830068,748649,1181531],"Manado":[790,1310,1200,914865,1515225,1442252]}},{"n":"NUTRISARI INSTANT DRINK STRAWBERRY SCT 11g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,0,0,0,0,0],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,0,0,0,0]}},{"n":"NUTRISARI INSTANT DRINK SWEET GUAVA SCT 11g","t":"SCT","d":{"Gorontalo":[430,350,270,474550,386261,297973],"Kendari":[140,320,300,169369,403604,378378],"Makassar":[280,260,470,313676,315149,601261],"Manado":[0,0,0,0,0,0]}},{"n":"NUTRISARI INSTANT DRINK SWEET MANGGO SCT 11g","t":"SCT","d":{"Gorontalo":[2220,2300,2130,2531171,2884797,2675450],"Kendari":[0,0,0,0,0,0],"Makassar":[7480,6630,8860,8382829,7875162,10943018],"Manado":[6320,7290,5910,7305405,8652162,7276577]}},{"n":"NUTRISARI INSTANT DRINK TEH KRAMPUL ORANGE TEA SCT 11g","t":"SCT","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,0,0,0,0,0],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,0,0,0,0]}},{"n":"NUTRISARI MINUMAN SERBUK TEH INSTANT APPLE TEA SCT 11g","t":"SCT","d":{"Gorontalo":[670,450,630,758649,513784,720811],"Kendari":[160,160,230,190270,201802,290090],"Makassar":[110,230,210,138739,290090,245946],"Manado":[960,730,770,1115676,848378,933513]}},{"n":"NUTRISARI MINUMAN SERBUK TEH INSTANT BLACKCURANT TEA SCT 11g","t":"SCT","d":{"Gorontalo":[670,530,480,784685,620721,578378],"Kendari":[190,250,270,231982,315315,340541],"Makassar":[430,390,240,514369,465721,283288],"Manado":[910,910,590,1106757,1106757,730180]}},{"n":"NUTRISARI MINUMAN SERBUK TEH INSTANT LYCHEE TEA SCT 11g","t":"SCT","d":{"Gorontalo":[630,900,570,737838,1054054,667568],"Kendari":[180,340,310,214054,404324,390991],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,0,0,0,0]}},{"n":"NUTRISARI MINUMAN W'DANK BAJIGUR COCONUT LATTE RCG 10x15g","t":"RCG","d":{"Gorontalo":[0,0,0,0,0,0],"Kendari":[0,0,0,0,0,0],"Makassar":[0,0,0,0,0,0],"Manado":[0,0,0,0,0,0]}}]};
+// Ambang DOI (hari): di bawah LOW = kurang, sampai WARN = waspada, sampai HIGH = aman, di atasnya = berlebih.
+const T={low:15,warn:30,high:60};
+const NAME={low:'Kurang',warn:'Waspada',ok:'Aman',high:'Berlebih',idle:'Tanpa penjualan'};
+const DB='https://firestore.googleapis.com/v1/projects/mds-sulawesi/databases/(default)/documents/pjmds_data';
+const KEY='AIzaSyCA8Q8athqYIsY3By5wPxcU97GjDBR6DAs';
+const BLN=['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+const KOTA=[[/GORONTALO/,'Gorontalo'],[/MAKASS?AR/,'Makassar'],[/MANADO/,'Manado'],[/KENDARI/,'Kendari']];
+const kotaOf=c=>{c=c.toUpperCase();for(const [re,k] of KOTA)if(re.test(c))return k;return null};
 const $=id=>document.getElementById(id);
-const nf=new Intl.NumberFormat("id-ID",{maximumFractionDigits:0});
-const cf=new Intl.NumberFormat("id-ID",{notation:"compact",maximumFractionDigits:1});
-let kota="Manado";
-D.b.forEach((m,i)=>$("m"+(i+1)).textContent=m);
-function rowsOf(k){
-  return D.i.map(o=>{const d=o.d[k];return{n:o.n,t:o.t,q:d.slice(0,3),aq:(d[0]+d[1]+d[2])/3,ar:(d[3]+d[4]+d[5])/3}})
-    .filter(r=>r.aq>0).sort((a,b)=>b.aq-a.aq);
-}
+const nf=new Intl.NumberFormat('id-ID',{maximumFractionDigits:0});
+const cf=new Intl.NumberFormat('id-ID',{notation:'compact',maximumFractionDigits:1});
+const dlbl=d=>+d.slice(8)+' '+BLN[+d.slice(5,7)]+' '+d.slice(0,4);
+const wita=iso=>new Date(iso).toLocaleString('id-ID',{timeZone:'Asia/Makassar',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}).replace(/\./g,':')+' WITA';
+const status=(stock,avg)=>{if(avg<=0)return stock>0?'idle':null;const d=stock/avg*30;return d<T.low?'low':d<T.warn?'warn':d<=T.high?'ok':'high'};
+const doi=(stock,avg)=>avg>0?stock/avg*30:null;
+const fdoi=d=>d==null?'∞':nf.format(d)+' hari';
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
-function render(){
-  const r=rowsOf(kota);
-  const tq=r.reduce((s,x)=>s+x.aq,0),tr=r.reduce((s,x)=>s+x.ar,0);
-  $("take").replaceChildren(el("b",null,kota),document.createTextNode(" paling laku "),el("b",null,r[0]?r[0].n:"-"),document.createTextNode(", rata-rata "+nf.format(tq)+" QTY per bulan."));
-  $("tq").textContent=nf.format(tq);$("tr").textContent="Rp "+cf.format(tr);$("tn").textContent=r.length+" dari "+D.i.length;
-  const max=r[0]?r[0].aq:1;
-  $("bars").replaceChildren(...r.slice(0,10).map(x=>{
-    const row=el("div"),t=el("div","bt"),f=el("div","bf");
-    f.style.width="calc((100% - 5rem) * "+(x.aq/max)+")";
-    t.append(f,el("span","bv",nf.format(x.aq)));row.append(el("div","bn",x.n),t);return row;
+async function get(p){const r=await fetch(DB+'/'+p+'?key='+KEY);if(r.status===404)return null;if(!r.ok)throw new Error('Database tidak bisa dibaca ('+r.status+')');return r.json()}
+const field=(d,f)=>d&&d.fields&&d.fields[f]?d.fields[f].stringValue:null;
+
+let D=null,kota='Manado';
+async function load(){
+  const [sm,tm]=await Promise.all([get('so_meta'),get('stok_meta')]);
+  const months=Object.keys(JSON.parse(field(sm,'months')||'{}')).sort().slice(-3);
+  const metaSo=JSON.parse(field(sm,'months')||'{}'),metaSt=JSON.parse(field(tm,'snaps')||'{}');
+  const snaps=Object.keys(metaSt).sort().slice(-2);
+  if(!months.length)throw new Error('Belum ada data selling out. Import dulu lewat halaman import.');
+  const [so,st]=await Promise.all([Promise.all(months.map(m=>get('so_'+m))),Promise.all(snaps.map(s=>get('stok_'+s)))]);
+  const items=new Map();
+  const slot=(kode,name)=>{const t=(name.match(/\b(RCG|SCT)\b/)||[])[1];if(!t)return null;const key=kode+'|'+name;let o=items.get(key);
+    if(!o){o={n:name,t,kode,s:{},p:{},d:{}};items.set(key,o)}return o};
+  so.forEach((d,mi)=>JSON.parse(field(d,'data')).forEach(([cab,kode,name,q,r])=>{
+    const k=kotaOf(cab);if(!k)return;const o=slot(kode,name);if(!o)return;
+    const x=o.d[k]||(o.d[k]=[0,0,0,0,0,0]);x[mi]+=q;x[3+mi]+=r;
   }));
-  $("rows").replaceChildren(...r.map(x=>{
-    const tr=el("tr"),tp=el("td","t"),p=el("span","pill",x.t);tp.append(p);
-    tr.append(el("td",null,x.n),tp,...x.q.map(v=>el("td",null,nf.format(v))),el("td",null,nf.format(x.aq)),el("td",null,"Rp "+nf.format(x.ar)));return tr;
+  // stok dicocokkan lewat kode item
+  const byCode=new Map();items.forEach(o=>{if(!byCode.has(o.kode))byCode.set(o.kode,o)});
+  st.forEach((d,si)=>JSON.parse(field(d,'data')).forEach(([cab,kode,name,q])=>{
+    const k=kotaOf(cab);if(!k)return;const o=byCode.get(kode)||slot(kode,name);if(!o)return;
+    const tgt=si===st.length-1?o.s:o.p;tgt[k]=(tgt[k]||0)+q;
   }));
+  const ats=[...months.map(m=>metaSo[m].at),...snaps.map(s=>metaSt[s].at)];
+  D={months,items:[...items.values()],stokDate:snaps[snaps.length-1]||null,prevDate:snaps.length>1?snaps[0]:null,
+     lastSo:Object.values(metaSo).map(x=>x.at).sort().pop(),lastSt:Object.values(metaSt).map(x=>x.at).sort().pop()};
 }
-$("seg").addEventListener("click",e=>{
-  const b=e.target.closest("button");if(!b)return;
-  kota=b.dataset.k;
-  document.querySelectorAll("#seg button").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
-  render();
+function rowsOf(k){
+  const n=D.months.length;
+  return D.items.map(o=>{
+    const d=o.d[k]||[0,0,0,0,0,0],avg=(d[0]+d[1]+d[2])/n,stock=o.s[k]||0,prev=D.prevDate?(o.p[k]||0):null;
+    return{n:o.n,t:o.t,q:d.slice(0,3),avg,ar:(d[3]+d[4]+d[5])/n,stock,doi:doi(stock,avg),prev:prev==null?null:doi(prev,avg),st:status(stock,avg)};
+  }).filter(r=>r.st).sort((a,b)=>b.avg-a.avg||b.stock-a.stock);
+}
+function render(){
+  if(!D)return;
+  const r=rowsOf(kota),stock=r.reduce((s,x)=>s+x.stock,0),avg=r.reduce((s,x)=>s+x.avg,0),tot=doi(stock,avg),ts=status(stock,avg);
+  $('sub').textContent='Item RCG dan SCT · avg '+D.months.map(m=>BLN[+m.slice(5)]).join(', ')+' '+D.months[D.months.length-1].slice(0,4)+' · stok per '+(D.stokDate?dlbl(D.stokDate):'-')+' · Indogrosir + SPI';
+  const top=[...r].sort((a,b)=>b.avg-a.avg)[0];
+  $('take').replaceChildren(el('b',null,kota),document.createTextNode(' paling laku '),el('b',null,top?top.n:'-'),document.createTextNode(', DOI keseluruhan '+fdoi(tot)+'.'));
+  $('ts').textContent=nf.format(stock);$('tsd').textContent='pcs, update '+(D.stokDate?dlbl(D.stokDate):'-');
+  $('ta').textContent=nf.format(avg);$('tad').textContent='pcs per bulan, '+D.months.length+' bulan terakhir';
+  $('td').textContent=fdoi(tot);$('tdc').className='card tile '+(ts?'s-'+ts:'');
+  D.months.forEach((m,i)=>$('m'+(i+1)).textContent=BLN[+m.slice(5)]);
+  $('legend').textContent='Warna mengikuti DOI: kurang < '+T.low+' hari, waspada '+T.low+' sampai '+T.warn+', aman '+T.warn+' sampai '+T.high+', berlebih > '+T.high+' hari. Item tanpa penjualan tapi masih ada stok ditandai abu-abu.';
+  const cnt={};r.forEach(x=>cnt[x.st]=(cnt[x.st]||0)+1);
+  $('chips').replaceChildren(...['low','warn','ok','high','idle'].filter(s=>cnt[s]).map(s=>{const c=el('span','chip s-'+s);c.append(NAME[s]+' ',el('b',null,cnt[s]));return c}));
+  $('rows').replaceChildren(...r.map(x=>{
+    const tr=el('tr'),tp=el('td','t'),cell=(txt,sub)=>{const td=el('td','c s-'+x.st,txt);if(sub){td.append(el('small',null,sub))}return td};
+    tp.append(el('span','pill',x.t));
+    const sub=x.prev==null?null:'sebelumnya '+fdoi(x.prev);
+    tr.append(el('td',null,x.n),tp,cell(nf.format(x.stock)),cell(nf.format(x.avg)),cell(fdoi(x.doi),sub),...x.q.map(v=>el('td',null,nf.format(v))),el('td',null,'Rp '+nf.format(x.ar)));
+    return tr;
+  }));
+  const max=r.length?Math.max(...r.map(x=>x.avg)):1;
+  $('bars').replaceChildren(...[...r].sort((a,b)=>b.avg-a.avg).slice(0,10).map(x=>{
+    const row=el('div'),t=el('div','bt'),f=el('div','bf');f.style.width='calc((100% - 5rem) * '+(x.avg/max)+')';
+    t.append(f,el('span','bv',nf.format(x.avg)));row.append(el('div','bn',x.n),t);return row;
+  }));
+  $('foot').textContent='Terakhir upload: selling out '+(D.lastSo?wita(D.lastSo):'-')+' · stok '+(D.lastSt?wita(D.lastSt):'-')+'. Sumber: laporan Selling Out PD dan Stock Baik (Indogrosir dan SPI). Avg dibagi jumlah bulan, termasuk bulan tanpa penjualan. Cabang SPI bertambah sepanjang 2026, jadi bulan awal tidak sepenuhnya setara.';
+}
+$('seg').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;kota=b.dataset.k;
+  document.querySelectorAll('#seg button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));render();
 });
-render();
+load().then(render).catch(e=>{$('sub').textContent='';$('take').className='err';$('take').textContent=e.message});
 </script>
 </body>
 </html>
