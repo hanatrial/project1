@@ -38,6 +38,12 @@
   .po input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
   td.po-c{font-weight:700;color:var(--fg)}
   td.po-c.z{font-weight:400;color:var(--mut)}
+  #sh th{cursor:pointer;user-select:none}
+  #sh th:hover{color:var(--fg)}
+  #sh th:focus-visible{outline:2px solid var(--acc);outline-offset:-2px}
+  #sh th[aria-sort=ascending]::after{content:' ▲';font-size:.7em}
+  #sh th[aria-sort=descending]::after{content:' ▼';font-size:.7em}
+  #sh th[aria-sort]{color:var(--fg)}
   td.tr-c small{display:block;color:var(--mut);font-size:.72rem}
   td.tr-c.z{color:var(--mut)}
   .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,13rem),1fr));gap:12px}
@@ -100,7 +106,7 @@
     <input type="search" id="q" class="srch" placeholder="Cari nama item…" autocomplete="off" enterkeyhint="search" aria-label="Cari item">
     <p class="note" id="qn"></p>
     <div class="scroll"><table>
-      <thead><tr><th>Item</th><th>Tipe</th><th>Sat</th><th>Stock</th><th>Avg / bln</th><th>DOI</th><th>In transit</th><th>Suggest PO</th><th id="m1"></th><th id="m2"></th><th id="m3"></th><th>Avg Rp / bln</th></tr></thead>
+      <thead id="sh"><tr><th data-s="n">Item</th><th data-s="t">Tipe</th><th data-s="u">Sat</th><th data-s="stock">Stock</th><th data-s="avg">Avg / bln</th><th data-s="doi">DOI</th><th data-s="transit">In transit</th><th data-s="po">Suggest PO</th><th id="m1" data-s="m1"></th><th id="m2" data-s="m2"></th><th id="m3" data-s="m3"></th><th data-s="ar">Avg Rp / bln</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
   </section>
@@ -161,7 +167,10 @@ function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className
 async function get(p){const r=await fetch(DB+'/'+p+'?key='+KEY);if(r.status===404)return null;if(!r.ok)throw new Error('Database tidak bisa dibaca ('+r.status+')');return r.json()}
 const field=(d,f)=>d&&d.fields&&d.fields[f]?d.fields[f].stringValue:null;
 
-let D=null,kota='Manado',view='sum';
+let D=null,kota='Manado',view='sum',sortKey=null,sortDir='desc';
+const SORTV={n:x=>x.n,t:x=>x.t,u:x=>x.u,stock:x=>x.stock,avg:x=>x.avg,doi:x=>x.doi==null?Infinity:x.doi,transit:x=>x.transit,po:x=>x.po,m1:x=>x.q[0],m2:x=>x.q[1],m3:x=>x.q[2],ar:x=>x.ar};
+const sortRows=a=>{if(!sortKey)return a;const f=SORTV[sortKey],m=sortDir==='asc'?1:-1;
+  return a.slice().sort((x,y)=>{const p=f(x),q=f(y);const c=typeof p==='string'?p.localeCompare(q):(p===q?0:p<q?-1:1);return c*m||0});};
 async function load(){
   const [sm,stk,po]=await Promise.all([get('so_meta'),get('stok_terkini'),get('po_terkini')]);
   const metaSo=JSON.parse(field(sm,'months')||'{}'),months=Object.keys(metaSo).sort().slice(-3);
@@ -214,7 +223,8 @@ function renderSum(){
   $('td').textContent=fdoi(tot);$('tds').textContent='Stock ÷ Avg × 30 hari · in transit '+n1.format(tt)+' CTN'+(h.length?' · HILO '+fdoi(hd):'');$('tdc').className='card tile '+(ts?'s-'+ts:'');
   D.months.forEach((m,i)=>$('m'+(i+1)).textContent=BLN[+m.slice(5)]);
   $('legend').textContent='Suggest PO = Avg × DOI target ÷ 30 − Stock, dibulatkan ke atas per CTN. In transit = qty PO yang masih ACTIVE; angka kecil di bawahnya adalah DOI kalau barang itu sudah masuk. Warna mengikuti DOI: kurang < '+T.low+' hari, waspada '+T.low+' sampai '+T.warn+', aman '+T.warn+' sampai '+T.high+', berlebih > '+T.high+' hari. Item tanpa penjualan tapi masih ada stok ditandai abu-abu.';
-  const qs=$('q').value.trim().toLowerCase(),rr=qs?r.filter(x=>x.n.toLowerCase().includes(qs)):r;
+  const qs=$('q').value.trim().toLowerCase(),rr=sortRows(qs?r.filter(x=>x.n.toLowerCase().includes(qs)):r);
+  document.querySelectorAll('#sh th').forEach(th=>{if(th.dataset.s===sortKey)th.setAttribute('aria-sort',sortDir==='asc'?'ascending':'descending');else th.removeAttribute('aria-sort')});
   $('qn').textContent=qs?rr.length+' dari '+r.length+' item cocok dengan "'+$('q').value.trim()+'"':'';
   const cnt={};rr.forEach(x=>cnt[x.st]=(cnt[x.st]||0)+1);
   $('chips').replaceChildren(...['low','warn','ok','high','idle'].filter(s=>cnt[s]).map(s=>{const c=el('span','chip s-'+s);c.append(NAME[s]+' ',el('b',null,cnt[s]));return c}));
@@ -256,6 +266,11 @@ function render(){
 }
 $('q').addEventListener('input',render);
 $('q2').addEventListener('input',render);
+// klik judul kolom untuk mengurutkan; klik lagi membalik arah
+function sortBy(th){const k=th.dataset.s;if(!k)return;
+  if(sortKey===k)sortDir=sortDir==='asc'?'desc':'asc';else{sortKey=k;sortDir=(k==='n'||k==='t'||k==='u')?'asc':'desc'}
+  render();}
+document.querySelectorAll('#sh th').forEach(th=>{th.tabIndex=0;th.addEventListener('click',()=>sortBy(th));th.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();sortBy(th)}})});
 $('tabs').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;view=b.dataset.v;
   document.querySelectorAll('#tabs button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));render();
