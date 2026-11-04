@@ -304,7 +304,8 @@ function renderSum(){
   const top=r[0];
   $('take').replaceChildren(el('b',null,kota),document.createTextNode(' paling laku '),el('b',null,top?top.n:'-'),document.createTextNode(' (nilai rupiah), DOI item CTN '+fdoi(tot)+'.'));
   $('ts').textContent=n1.format(stock);$('tsd').textContent='CTN, update '+(D.stokDate?dlbl(D.stokDate):'-')+(h.length?' · HILO '+nf.format(hs)+' pcs':'');
-  $('ta').textContent=n1.format(avg);$('tad').textContent='CTN per bulan, '+D.months.length+' bulan terakhir'+(h.length?' · HILO '+nf.format(ha)+' pcs':'');
+  const avgRp=sum(r,'ar');   // nilai rupiah rata-rata per bulan, semua item (CTN + HILO)
+  $('ta').textContent='Rp '+cf.format(avgRp);$('tad').textContent='Rp '+nf.format(avgRp)+' per bulan, '+D.months.length+' bulan terakhir';
   $('tp').textContent=nf.format(pc);$('tpd').textContent='CTN agar DOI '+target+' hari'+(h.length?' · HILO '+nf.format(ph)+' pcs':'');
   $('td').textContent=fdoi(tot);$('tds').textContent='Stock ÷ Avg × 30 hari · in transit '+n1.format(tt)+' CTN'+(h.length?' · HILO '+fdoi(hd):'');$('tdc').className='card tile '+(ts?'s-'+ts:'');
   D.months.forEach((m,i)=>$('m'+(i+1)).textContent=BLN[+m.slice(5)]);
