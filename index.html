@@ -287,11 +287,17 @@ async function load(){
   D={months,items:[...items.values()],stokDate:stk?field(stk,'tanggal'):null,
      lastSo:Object.values(metaSo).map(x=>x.at).sort().pop(),lastSt:stk?field(stk,'at'):null,poDate:po?field(po,'tanggal'):null,lastPo:po?field(po,'at'):null,poRows};
 }
+// harga rata-rata per satuan dasar (Rp / pcs) dari selling out 3 bulan: kota itu dulu, kalau tidak ada penjualan di kota itu pakai semua kota
+function unitPrice(o,k){
+  const r=(x)=>{const q=x[0]+x[1]+x[2];return q>0?(x[3]+x[4]+x[5])/q:0};
+  const own=o.d[k]?r(o.d[k]):0;if(own>0)return own;
+  const all=Object.values(o.d).reduce((a,x)=>a.map((v,i)=>v+x[i]),[0,0,0,0,0,0]);return r(all);
+}
 function rowsOf(k){
   const n=D.months.length;
   return D.items.map(o=>{
-    const {u,div}=unitOf(o.n),d=o.d[k]||[0,0,0,0,0,0],avg=(d[0]+d[1]+d[2])/n/div,stock=Math.max(0,o.s[k]||0)/div,transit=(o.it[k]||0)/div;
-    return{kode:o.kode,n:o.n,t:o.t,u,q:d.slice(0,3).map(v=>v/div),avg,ar:(d[3]+d[4]+d[5])/n,stock,doi:doi(stock,avg),transit,doiT:doi(stock+transit,avg),po:poOf(avg,stock+transit),st:status(stock,avg)};
+    const {u,div}=unitOf(o.n),d=o.d[k]||[0,0,0,0,0,0],avg=(d[0]+d[1]+d[2])/n/div,stock=Math.max(0,o.s[k]||0)/div,transit=(o.it[k]||0)/div,sv=Math.max(0,o.s[k]||0)*unitPrice(o,k);
+    return{kode:o.kode,n:o.n,t:o.t,u,q:d.slice(0,3).map(v=>v/div),avg,ar:(d[3]+d[4]+d[5])/n,stock,sv,doi:doi(stock,avg),transit,doiT:doi(stock+transit,avg),po:poOf(avg,stock+transit),st:status(stock,avg)};
   }).filter(r=>r.st).sort((a,b)=>grp(a.n)-grp(b.n)||b.ar-a.ar||b.stock-a.stock);
 }
 function renderSum(){
@@ -303,7 +309,8 @@ function renderSum(){
   $('sub').textContent='Item RCG dan SCT · avg '+D.months.map(m=>BLN[+m.slice(5)]).join(', ')+' '+D.months[D.months.length-1].slice(0,4)+' · stok per '+(D.stokDate?dlbl(D.stokDate):'-')+' · Indogrosir + SPI';
   const top=r[0];
   $('take').replaceChildren(el('b',null,kota),document.createTextNode(' paling laku '),el('b',null,top?top.n:'-'),document.createTextNode(' (nilai rupiah), DOI item CTN '+fdoi(tot)+'.'));
-  $('ts').textContent=n1.format(stock);$('tsd').textContent='CTN, update '+(D.stokDate?dlbl(D.stokDate):'-')+(h.length?' · HILO '+nf.format(hs)+' pcs':'');
+  const stockRp=sum(r,'sv');   // nilai stok = qty stok × harga rata-rata selling out (Rp per satuan), semua item (CTN + HILO)
+  $('ts').textContent='Rp '+cf.format(stockRp);$('tsd').textContent='Rp '+nf.format(stockRp)+' · update '+(D.stokDate?dlbl(D.stokDate):'-');
   const avgRp=sum(r,'ar');   // nilai rupiah rata-rata per bulan, semua item (CTN + HILO)
   $('ta').textContent='Rp '+cf.format(avgRp);$('tad').textContent='Rp '+nf.format(avgRp)+' per bulan, '+D.months.length+' bulan terakhir';
   $('tp').textContent=nf.format(pc);$('tpd').textContent='CTN agar DOI '+target+' hari'+(h.length?' · HILO '+nf.format(ph)+' pcs':'');
