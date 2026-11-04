@@ -103,31 +103,12 @@
     .ctrl .tabs button{flex:1 1 auto;min-height:42px;padding:8px 6px;font-size:.92rem;white-space:nowrap}
     .ctrl .seg button{min-height:42px}
     .po input,.srch{font-size:16px}
-    .srch.sel{display:block}
     .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
     .tile{padding:12px}
     .tile .big{font-size:1.45rem}
-    .scroll{max-height:none;overflow:visible;border:0;margin-top:12px}
     .card{padding:14px}
-    table.cards,table.cards tbody{display:block}
-    table.cards thead{display:none}
-    table.cards tbody tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:12px;margin-bottom:10px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
-    table.cards tbody td:nth-child(n){display:block;border:0;padding:6px 8px;border-radius:6px;white-space:normal;text-align:left;min-width:0;font-size:.9rem}
-    table.cards tbody td::before{content:attr(data-l);display:block;font-size:.66rem;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);font-weight:600}
-    table.cards tbody tr:hover td:not(.c){background:transparent}
-    /* Item summary */
-    #rows td:nth-child(1){grid-column:1/-1;font-weight:600;padding-inline:0;font-size:.95rem}
-    #rows td:nth-child(1)::before{display:none}
-    #rows td:nth-child(2),#rows td:nth-child(3){display:none}
-    #rows td:nth-child(7){grid-column:span 2}
-    #rows td:nth-child(12){grid-column:1/-1}
-    small.mini{display:block;font-weight:400;color:var(--mut);font-size:.72rem;margin-top:2px}
-    /* PO */
-    #prows td:nth-child(4){grid-column:1/-1;order:-1;font-weight:600;padding-inline:0}
-    #prows td:nth-child(4)::before{display:none}
-    #prows td:nth-child(2){grid-column:span 2}
-    #prows td:nth-child(3){grid-column:1/-1}
-    #prows td:nth-child(8){grid-column:1/-1}
+    /* tabel tampil seperti desktop; di layar kecil digeser kiri-kanan di dalam .scroll */
+    .scroll{-webkit-overflow-scrolling:touch}
   }
   .tabs button{border-radius:8px;padding:8px 20px}
   .tabs button[aria-pressed=true]{background:var(--card);color:var(--acc);border-color:var(--acc);box-shadow:inset 0 -3px 0 var(--red)}
@@ -195,7 +176,7 @@
     </select>
     <input type="search" id="q" class="srch" placeholder="Cari nama item…" autocomplete="off" enterkeyhint="search" aria-label="Cari item">
     <p class="note" id="qn"></p>
-    <div class="scroll"><table class="cards">
+    <div class="scroll"><table>
       <thead id="sh"><tr><th data-s="n">Item</th><th data-s="t">Tipe</th><th data-s="u">Sat</th><th data-s="stock">Stock</th><th data-s="avg">Avg / bln</th><th data-s="doi">DOI</th><th data-s="transit">In transit</th><th data-s="po">Suggest PO</th><th id="m1" data-s="m1"></th><th id="m2" data-s="m2"></th><th id="m3" data-s="m3"></th><th data-s="ar">Avg Rp / bln</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
@@ -214,7 +195,7 @@
       <p class="note" id="pnote"></p>
       <input type="search" id="q2" class="srch" placeholder="Cari item atau nomor PO…" autocomplete="off" enterkeyhint="search" aria-label="Cari item atau nomor PO">
       <p class="note" id="qn2"></p>
-      <div class="scroll"><table class="t2 cards">
+      <div class="scroll"><table class="t2">
         <thead><tr><th>Tgl PO</th><th>PO No.</th><th>Cabang</th><th>Item</th><th>QTY pcs</th><th>QTY CTN</th><th>Nilai (Rp)</th><th>Expired</th></tr></thead>
         <tbody id="prows"></tbody>
       </table></div>
