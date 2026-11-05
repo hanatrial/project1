@@ -74,6 +74,9 @@
   table{width:100%;border-collapse:collapse;font-size:.82rem;font-variant-numeric:tabular-nums}
   th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
   th:first-child,td:first-child{text-align:left;white-space:normal;min-width:13rem}
+  #insTbl th,#insTbl td{padding:8px 4px;font-size:.74rem}
+  #insTbl th:first-child,#insTbl td:first-child{min-width:5.5rem}
+  #insNote{font-size:.8rem}
   th{position:sticky;top:0;background:var(--th);color:#fff;font-weight:600;border-bottom:0}
   tbody tr:hover td:not(.c){background:color-mix(in srgb,var(--acc) 7%,transparent)}
   td.t{text-align:center}
@@ -143,6 +146,7 @@
     <button type="button" data-v="sum" aria-pressed="true">Summary</button>
     <button type="button" data-v="EXPIRED" aria-pressed="false">PO Expired</button>
     <button type="button" data-v="RECEIVED" aria-pressed="false">PO Received</button>
+    <button type="button" id="tabIns" data-v="INSENTIF" aria-pressed="false" hidden>Target MDS</button>
   </div>
   </div>
   <div id="v-sum" class="col">
@@ -181,6 +185,13 @@
       <tbody id="rows"></tbody>
     </table></div>
   </section>
+  </div>
+  <div id="v-ins" class="col" hidden>
+    <section class="card">
+      <h2 style="margin:0 0 6px">Target MDS <span id="insK"></span></h2>
+      <p class="take" id="insNote" style="margin:0 0 10px"></p>
+      <div class="scroll"><table id="insTbl"></table></div>
+    </section>
   </div>
   <div id="v-po" class="col" hidden>
     <p class="take" id="ptake"></p>
@@ -284,7 +295,21 @@ async function load(){
     const o=byCode.get(kode)||slot(kode,name);if(!o)return;
     o.it[k]=(o.it[k]||0)+q;
   });
-  D={months,items:[...items.values()],stokDate:stk?field(stk,'tanggal'):null,
+  // Target MDS: Ach dari NILAI selling out bulan terbaru yang sudah diimport (semua item).
+  // NS All = semua NUTRISARI; NS Varian = NutriSari selain ASO (Gorontalo) / selain Jeruk Peras (Makassar); NS Tea = NutriSari item teh;
+  // Hilo = semua HILO; Hilo Renceng = HILO item renceng (RCG = PLS)
+  const kpi={};
+  if(so.length&&so[so.length-1])JSON.parse(field(so[so.length-1],'data')).forEach(([cab,kode,name,q,r])=>{
+    const k=kotaOf(cab);if(!k)return;const n=String(name).toUpperCase(),o=kpi[k]||(kpi[k]={nsAll:0,nsNoAso:0,nsNoJupe:0,nsTea:0,hilo:0,hiloRcg:0});
+    if(/HI ?LO/.test(n)){o.hilo+=r;if(/\bRCG\b/.test(n))o.hiloRcg+=r}
+    else if(/NUTRISARI/.test(n)){
+      o.nsAll+=r;
+      if(!/AMRCN SWT OR|AMERICAN SWEET ORANGE|\bASO\b/.test(n))o.nsNoAso+=r;
+      if(!/JERUK PERAS/.test(n))o.nsNoJupe+=r;
+      if(/\bTEA\b|\bTEH\b/.test(n))o.nsTea+=r;
+    }
+  });
+  D={months,kpi,items:[...items.values()],stokDate:stk?field(stk,'tanggal'):null,
      lastSo:Object.values(metaSo).map(x=>x.at).sort().pop(),lastSt:stk?field(stk,'at'):null,poDate:po?field(po,'tanggal'):null,lastPo:po?field(po,'at'):null,poRows};
 }
 // harga rata-rata per satuan dasar (Rp / pcs) dari selling out 3 bulan: kota itu dulu, kalau tidak ada penjualan di kota itu pakai semua kota
@@ -362,8 +387,27 @@ function render(){
   const off=$('off');off.hidden=!offline;
   if(offline)off.textContent='Tidak ada internet. Menampilkan data tersimpan terakhir'+(lsGet('loadedAt')?' ('+wita(lsGet('loadedAt'))+')':'')+'.';
   $('sortsel').value=sortKey?sortKey+'|'+sortDir:'';
-  const sum=view==='sum';$('v-sum').hidden=!sum;$('v-po').hidden=sum;
-  if(sum)renderSum();else renderPO();
+  // tab Target MDS hanya untuk Makassar dan Gorontalo
+  const insOk=kota==='Makassar'||kota==='Gorontalo';$('tabIns').hidden=!insOk;
+  if(view==='INSENTIF'&&!insOk){view='sum';document.querySelectorAll('#tabs button').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v==='sum')))}
+  const sum=view==='sum',ins=view==='INSENTIF';$('v-sum').hidden=!sum;$('v-po').hidden=sum||ins;$('v-ins').hidden=!ins;
+  if(sum)renderSum();else if(ins)renderIns();else renderPO();
+}
+// target per kota: [kunci nilai, nama baris, target Rp]
+const TARGET_MDS={
+  Makassar:[['nsAll','Omzet NS All',125000000],['nsNoJupe','Omzet NS Varian (Selain Jupe)',40000000],['nsTea','Omzet NS Tea',7500000],['hiloRcg','Omzet Hilo Renceng',5000000]],
+  Gorontalo:[['nsAll','Omzet NS All',300000000],['nsNoAso','Omzet NS Varian (Selain ASO)',50000000],['hilo','Omzet Hilo (All)',12500000]]
+};
+const KET_MDS={
+  Makassar:'NS All = semua NutriSari; NS Varian = NutriSari selain Jeruk Peras (Jupe); NS Tea = semua item teh NutriSari; Hilo Renceng = semua item HILO renceng (PLS).',
+  Gorontalo:'NS All = semua NutriSari; NS Varian = NutriSari selain American Sweet Orange (ASO); Hilo = semua HILO.'
+};
+function renderIns(){
+  $('insK').textContent='· '+kota;
+  const a=(D.kpi&&D.kpi[kota])||{nsAll:0,nsVar:0,hilo:0},bln=D.months[D.months.length-1];
+  $('insNote').textContent='Ach dari nilai selling out '+BLN[+bln.slice(5)]+' '+bln.slice(0,4)+' (data terbaru yang sudah diimport). '+(KET_MDS[kota]||'');
+  const rows=(TARGET_MDS[kota]||[]).map(([k,l,t])=>{const v=a[k]||0,p=Math.round(v/t*100);return '<tr><td>'+l+'</td><td>'+nf.format(t)+'</td><td>'+nf.format(v)+'</td><td style="font-weight:700;color:var('+(p>=100?'--ok,#137a5a':'--red')+')">'+p+'%</td></tr>'}).join('');
+  $('insTbl').innerHTML='<thead><tr><th>KPI MDS</th><th>Target</th><th>Ach</th><th>%Ach</th></tr></thead><tbody>'+rows+'</tbody>';
 }
 $('q').addEventListener('input',render);
 $('q2').addEventListener('input',render);
