@@ -295,12 +295,14 @@ async function load(){
     const o=byCode.get(kode)||slot(kode,name);if(!o)return;
     o.it[k]=(o.it[k]||0)+q;
   });
-  // Target MDS: Ach dari NILAI selling out bulan terbaru yang sudah diimport (semua item).
+  // Target MDS: Ach dari NILAI selling out bulan terbaru yang sudah diimport (hanya item RCG dan SCT).
   // NS All = semua NUTRISARI; NS Varian = NutriSari selain ASO (Gorontalo) / selain Jeruk Peras (Makassar); NS Tea = NutriSari item teh;
   // Hilo = semua HILO; Hilo Renceng = HILO item renceng (RCG = PLS)
   const kpi={};
   if(so.length&&so[so.length-1])JSON.parse(field(so[so.length-1],'data')).forEach(([cab,kode,name,q,r])=>{
-    const k=kotaOf(cab);if(!k)return;const n=String(name).toUpperCase(),o=kpi[k]||(kpi[k]={nsAll:0,nsNoAso:0,nsNoJupe:0,nsTea:0,hilo:0,hiloRcg:0});
+    const k=kotaOf(cab);if(!k)return;const n=String(name).toUpperCase();
+    if(!/\b(RCG|SCT)\b/.test(n))return;   // Ach hanya item renceng (RCG) dan sachet (SCT), sama seperti dashboard
+    const o=kpi[k]||(kpi[k]={nsAll:0,nsNoAso:0,nsNoJupe:0,nsTea:0,hilo:0,hiloRcg:0});
     if(/HI ?LO/.test(n)){o.hilo+=r;if(/\bRCG\b/.test(n))o.hiloRcg+=r}
     else if(/NUTRISARI/.test(n)){
       o.nsAll+=r;
@@ -405,7 +407,7 @@ const KET_MDS={
 function renderIns(){
   $('insK').textContent='· '+kota;
   const a=(D.kpi&&D.kpi[kota])||{nsAll:0,nsVar:0,hilo:0},bln=D.months[D.months.length-1];
-  $('insNote').textContent='Ach dari nilai selling out '+BLN[+bln.slice(5)]+' '+bln.slice(0,4)+' (data terbaru yang sudah diimport). '+(KET_MDS[kota]||'');
+  $('insNote').textContent='Ach dari nilai selling out '+BLN[+bln.slice(5)]+' '+bln.slice(0,4)+' (data terbaru yang sudah diimport), hanya item renceng (RCG) dan sachet (SCT). '+(KET_MDS[kota]||'');
   const rows=(TARGET_MDS[kota]||[]).map(([k,l,t])=>{const v=a[k]||0,p=Math.round(v/t*100);return '<tr><td>'+l+'</td><td>'+nf.format(t)+'</td><td>'+nf.format(v)+'</td><td style="font-weight:700;color:var('+(p>=100?'--ok,#137a5a':'--red')+')">'+p+'%</td></tr>'}).join('');
   $('insTbl').innerHTML='<thead><tr><th>KPI MDS</th><th>Target</th><th>Ach</th><th>%Ach</th></tr></thead><tbody>'+rows+'</tbody>';
 }
