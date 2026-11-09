@@ -322,10 +322,24 @@ function unitPrice(o,k){
 }
 function rowsOf(k){
   const n=D.months.length;
-  return D.items.map(o=>{
+  const rows=D.items.map(o=>{
     const {u,div}=unitOf(o.n),d=o.d[k]||[0,0,0,0,0,0],avg=(d[0]+d[1]+d[2])/n/div,stock=Math.max(0,o.s[k]||0)/div,transit=(o.it[k]||0)/div,sv=Math.max(0,o.s[k]||0)*unitPrice(o,k);
     return{kode:o.kode,n:o.n,t:o.t,u,q:d.slice(0,3).map(v=>v/div),avg,ar:(d[3]+d[4]+d[5])/n,stock,sv,doi:doi(stock,avg),transit,doiT:doi(stock+transit,avg),po:poOf(avg,stock+transit),st:status(stock,avg)};
-  }).filter(r=>r.st).sort((a,b)=>grp(a.n)-grp(b.n)||b.ar-a.ar||b.stock-a.stock);
+  });
+  return mergeSwiss(rows).filter(r=>r.st).sort((a,b)=>grp(a.n)-grp(b.n)||b.ar-a.ar||b.stock-a.stock);
+}
+// Swiss Chocolate dijual dengan dua nama (SCT 28g = sachet, RCG 10x28g = renceng). Digabung jadi satu baris dalam CTN:
+// qty/avg/stok/in transit dijumlah setelah masing-masing dikonversi ke CTN (SCT ÷ 120, RCG ÷ 12), lalu DOI dan PO dihitung ulang.
+const isSwissPair=r=>/SWISS CHOCOLATE (SCT|RCG)\b/i.test(r.n)&&!/PLATINUM/i.test(r.n);
+function mergeSwiss(rows){
+  const sw=rows.filter(isSwissPair);if(sw.length<2)return rows;
+  const sum=f=>sw.reduce((a,r)=>a+r[f],0);
+  const stock=sum('stock'),transit=sum('transit'),avg=sum('avg');
+  const m={kode:sw.map(r=>r.kode).join(' + '),n:'HILO SUSU BUBUK HI-CALCIUM SWISS CHOCOLATE',t:'RCG+SCT',u:'CTN',
+    q:[0,1,2].map(i=>sw.reduce((a,r)=>a+r.q[i],0)),avg,ar:sum('ar'),stock,sv:sum('sv'),doi:doi(stock,avg),transit,doiT:doi(stock+transit,avg),po:poOf(avg,stock+transit),st:status(stock,avg)};
+  const out=[];let put=false;
+  rows.forEach(r=>{if(isSwissPair(r)){if(!put){out.push(m);put=true}}else out.push(r)});
+  return out;
 }
 function renderSum(){
   if(!D)return;

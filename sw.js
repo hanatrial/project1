@@ -1,6 +1,6 @@
 // Service worker: kerangka aplikasi tersimpan agar cepat dibuka dan tetap terbuka saat offline.
 // Halaman: jaringan dulu (selalu versi terbaru), cadangan dari cache. Data Firestore disimpan oleh halaman sendiri.
-const V = "so-doi-v8";
+const V = "so-doi-v9";
 const SHELL = ["./", "./index.html", "./import.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
